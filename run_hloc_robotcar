@@ -1,0 +1,121 @@
+#!/bin/bash
+root=/scratch2
+#root=/scratches/flyer_2
+
+outputs=$root/fx221/localization/outputs/robotcar
+dataset=$root/fx221/localization/RobotCar-Seasons
+save_root=$root/fx221/exp/shloc/robotcar
+
+image_dir=$root/fx221/localization/RobotCar-Seasons/images
+seg_dir=$root/fx221/localization/robotcar/global_seg_instance
+weight_name=2021_08_29_12_49_48_aachen_pspf_resnext101_32x4d_d4_u8_b16_R256_E120_ceohem_adam_seg_cls_aug_stylized
+
+query_fn=$dataset/queries_with_intrinsics_rear.txt
+query_pair=/data/cornucopia/fx221/localization/outputs/robotcar-seasons/pairs-robotcar-query-netvlad20-percam-perloc.txt
+gt_pose_fn=/data/cornucopia/fx221/localization/RobotCar-Seasons/3D-models/query_poses_v2.txt
+
+#query_fn=$dataset/db_with_intrinsics_rear.txt
+#query_pair=/data/cornucopia/fx221/localization/outputs/robotcar-seasons/pairs-db-covis20.txt
+#gt_pose_fn=/data/cornucopia/fx221/localization/RobotCar-Seasons/3D-models/db_poses.txt
+
+
+
+
+colmap=/home/mifs/fx221/Research/Software/bin/colmap
+#colmap=/home/mifs/fx221/Research/Software/nanaban/bin/colmap
+
+
+#feat=resnete2-ms-n10000-r1600-0005-mask
+#feat=resnete2-n4096-r1600-0005-mask
+
+#feat=resnete2-ap-n3000-r1600-001-mask
+#feat=resnete2-ap-n4096-r1600-001-mask
+#feat=resnete2-ap-n10000-r1600-001-mask
+#feat=resnete2-ap-n4096-r1024-0005-mask
+
+
+
+#feat=resnete2-tr-n3000-r1024-001-mask
+#feat=resnete2-tr-n4096-r1024-001-mask
+#feat=resnete2-tr-n3000-r1024-0005-mask
+feat=resnete2-tr-n4096-r1024-0005-mask
+
+
+matcher=NNM
+#matcher=NNML
+
+only_gt=1
+#feature_type="feat_max"
+feature_type="max"
+global_score_th=0.95
+#feature_type="gem_hard_max256"
+#feature_type="gem_hard_avg256"
+#global_score_th=0.6
+#feature_type="netvlad"
+#feature_type="netvlad_1024"
+#global_score_th=0.6
+
+version="v6"
+rec_th=50
+nv_th=50
+ransac_thresh=12
+opt_thresh=12
+depth_th=0
+covisibility_frame=50
+init_type="clu"
+#retrieval_type="lrnv"
+retrieval_type="nv"
+#init_type="single"
+#opt_type="proj"
+#opt_type="proj_ras"
+#opt_type="cluster"
+opt_type="cluref"
+k_seg=10
+k_can=5
+k_rec=30
+iters=5
+radius=50
+obs_thresh=3
+
+# with opt
+python3 -m localization.hloc \
+    --only_gt $only_gt \
+    --retrieval_type $retrieval_type \
+    --gt_pose_fn $gt_pose_fn \
+    --image_dir $image_dir \
+    --seg_dir $seg_dir \
+    --dataset robotcar \
+    --save_root $save_root \
+    --k_seg $k_seg \
+    --k_can $k_can \
+    --k_rec $k_rec \
+    --pversion 3 \
+    --rversion 3 \
+    --version $version \
+    --feature_type $feature_type \
+    --init_type $init_type \
+    --global_score_th $global_score_th \
+    --weight_name $weight_name \
+    --show_seg \
+    --reference_sfm $outputs/sfm_$feat-$matcher/model \
+    --queries $query_fn \
+    --retrieval $query_pair \
+    --features $outputs/feats-$feat.h5 \
+    --matcher_method $matcher \
+    --ransac_thresh $ransac_thresh \
+    --with_label \
+    --with_match \
+    --with_dist \
+    --rec_th $rec_th \
+    --nv_th $nv_th \
+    --covisibility_frame $covisibility_frame \
+    --plus05 \
+    --iters $iters \
+    --radius $radius \
+    --depth_th $depth_th \
+    --obs_thresh $obs_thresh \
+    --opt_thresh $opt_thresh \
+    --opt_type $opt_type \
+    --do_covisible_opt
+#    \
+#     --do_covisible_opt \

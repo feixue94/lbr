@@ -1,0 +1,144 @@
+#!/bin/bash
+#dataset=/home/mifs/fx221/data/localization/aachen_v1_1
+#dataset=/data/cornucopia/fx221/localization/aachen_v1_1
+#outputs=/home/mifs/fx221/data/localization/outputs/aachen_v1_1
+#outputs=/data/cornucopia/fx221/localization/outputs/aachen_v1_1
+#root=/scratch2
+root=/scratches/flyer_2
+
+dataset=$root/fx221/localization/aachen_v1_1
+outputs=$root/fx221/localization/outputs/aachen_v1_1
+image_dir=$root/fx221/localization/aachen_v1_1/images/images_upright
+#seg_dir=$root/fx221/localization/aachen_v1_1/global_seg_instance
+seg_dir=$root/fx221/localization/aachen_v1_1/global_seg_instance/remap
+save_root=$root/fx221/exp/shloc/aachen
+
+#feat=sgd2nb-20210709211950-d32-sdsssf-ms-n4096-r1024-0001
+#feat=superpoint-n4096-r1024
+#feat=superpoint-n4096-r1024-mask
+#feat=r2d2-n4096-r1024-mask
+#feat=r2d2-rmax1600-10k
+#feat=r2d2-rmax1600-10k-mask
+#feat=resnete2-ms-n4096-r1600-001-mask
+#feat=resnete2-ap-ms-n4096-r1600-001
+
+#feat=resnete2-ms-n10000-r1600-0005-mask
+#feat=resnete2-n4096-r1600-0005-mask
+
+#feat=resnete2-ap-n4096-r1600-0005-mask
+#feat=resnete2-ap-n3000-r1600-001-mask
+#feat=resnete2-ap-n4096-r1600-001-mask
+#feat=resnete2-ap-n10000-r1600-001-mask
+
+
+#feat=resnete2-tr-n3000-r1600-001-mask
+#feat=resnete2-tr-n4096-r1600-001-mask
+#feat=resnete2-tr-n4096-r1600-0005-mask
+#feat=resnete2-tr-n3000-r1600-0005-mask
+#feat=resnete2-tr-n2000-r1600-0005-mask
+#feat=resnete2-tr-n1000-r1600-0005-mask
+
+#feat=resnete2-tr-n3000-r1600-0005
+#feat=resnete2-tr-n4096-r1600-0005
+
+#feat=resnetxn-ori-0005-n4096-r1600-mask
+#feat=resnetxn-ori-0001-n4096-r1600-mask
+#feat=resnetxn-triv2-0001-n4096-r1600-mask
+#feat=resnetxn-triv2-0001-n1000-r1600-mask
+#feat=resnetxn-triv2-0001-n2000-r1600-mask
+feat=resnetxn-triv2-0001-n3000-r1600-mask
+
+
+#feat=resnetxn-triv2-ms-0001-n4096-r1600-mask
+#feat=resnetxn-triv2-ms-0001-n10000-r1600-mask
+
+
+weight_name=2021_08_29_12_49_48_aachen_pspf_resnext101_32x4d_d4_u8_b16_R256_E120_ceohem_adam_seg_cls_aug_stylized
+#weight_name=2021_09_06_15_13_26_aachen_deeplabv3p_resnet101_d5_u2_b8_R256_E120_ceohem_sgd_mlr_seg_cls_aug_stylized
+#weight_name=2021_09_08_19_27_29_aachen_deeplabv3p_resnext101_32x4d_d5_u2_b16_R256_E120_ceohem_sgd_poly_mlr_seg_cls_aug_stylized
+#weight_name=2021_09_11_22_12_37_aachen_deeplabv3p_resnext101_32x4d_d4_u2_b16_R256_E120_ceohem_sgd_poly_mlr_seg_cls_aug_stylized
+#save_dir=/data/cornucopia/fx221/exp/shloc/aachen/$weight_name/loc_by_seg
+save_dir=/scratches/flyer_2/fx221/exp/shloc/aachen/$weight_name/loc_by_seg
+
+#query_pair="/home/mifs/fx221/Research/Code/Hierarchical-Localization/pairs/aachen_v1.1/pairs-query-netvlad50.txt"
+query_pair="/data/cornucopia/fx221/localization/outputs_hloc/aachen_v1.1/pairs-query-netvlad50.txt"
+#query_pair="/scratch2/fx221/exp/shloc/aachen/2021_08_29_12_49_48_aachen_pspf_resnext101_32x4d_d4_u8_b16_R256_E120_ceohem_adam_seg_cls_aug_stylized/pairs-query-db-feat-max50.txt"
+#query_pair=None
+#query_pair=$root/fx221/exp/shloc/aachen/$weight_name/2021_10_12_01_09_42_aachen_netvlad_B3_R256_E60_D1024_max_ap_P16_N79_proj_kr/pairs_epoch39_netvlad_50.txt
+#query_pair=$root/fx221/exp/shloc/aachen/$weight_name/Oct05_13-34-38_vgg16_netvlad_D512_R512/pairs_epoch22_vgg16_50.txt
+#query_pair="nv_256_50.txt"
+
+
+
+#matcher=NNM
+matcher=NNML
+#matcher=NNR
+retrieval_type="lrnv"
+#retrieval_type="lrnv256"
+feature_type="feat_max"
+global_score_th=0.95
+#feature_type="gem_hard_max256"
+#feature_type="gem_hard_avg256"
+#global_score_th=0.6
+#feature_type="netvlad"
+#feature_type="netvlad_1024"
+#global_score_th=0.6
+version="v6"
+rec_th=100
+nv_th=50
+ransac_thresh=12
+opt_thresh=12
+covisibility_frame=50
+init_type="clu"
+#init_type="single"
+#opt_type="proj"
+#opt_type="proj_ras"
+#opt_type="cluster"
+opt_type="cluref"
+k_seg=10
+k_can=5
+k_rec=30
+iters=5
+radius=20
+obs_thresh=3
+
+# with opt
+python3 -m localization.hloc \
+    --image_dir $image_dir \
+    --seg_dir $seg_dir \
+    --save_root $save_root \
+    --dataset aachen \
+    --k_seg $k_seg \
+    --k_can $k_can \
+    --k_rec $k_rec \
+    --pversion 3 \
+    --rversion 3 \
+    --version $version \
+    --retrieval $query_pair \
+    --retrieval_type $retrieval_type \
+    --feature_type $feature_type \
+    --init_type $init_type \
+    --global_score_th $global_score_th \
+    --weight_name $weight_name \
+    --show_seg \
+    --reference_sfm $outputs/sfm_$feat-$matcher/model \
+    --queries $dataset/queries/day_night_time_queries_with_intrinsics.txt \
+    --features $outputs/feats-$feat.h5 \
+    --matcher_method $matcher \
+    --ransac_thresh $ransac_thresh \
+    --with_label \
+    --with_match \
+    --with_dist \
+    --rec_th $rec_th \
+    --nv_th $nv_th \
+    --covisibility_frame $covisibility_frame \
+    --plus05 \
+    --iters $iters \
+    --radius $radius \
+    --obs_thresh $obs_thresh \
+    --opt_thresh $opt_thresh \
+    --opt_type $opt_type \
+    --do_covisible_opt
+#    \
+#    --retrieval $query_pair \
+#     --do_covisible_opt \
