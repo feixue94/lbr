@@ -9,21 +9,10 @@ import torch
 import torch.utils.data as data
 from torch.utils.data.dataloader import *
 import numpy as np
-import os
 import os.path as osp
-from pathlib import Path
-from glob import glob
-import tqdm
-import random
-import time
 import cv2
-import copy
-from threading import Thread
-from dataloader.augmentation import RandomRotation, RandomHorizontalFlip, RandomSizedCrop
-import torchvision.transforms as tvf
 import random
 from tools.common import resize_img
-
 
 
 class RobotCarSegFull(data.Dataset):

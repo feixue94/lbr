@@ -696,5 +696,3 @@ if __name__ == '__main__':
                 print('Theta: %.4f, Phi: %.4f' % (cur_theta, cur_phi))
                 img_updated = True
                 break
-
-# if __name__ == '__main__':

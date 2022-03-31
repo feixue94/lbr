@@ -13,15 +13,6 @@ image_dir=$root/fx221/localization/aachen_v1_1/images/images_upright
 seg_dir=$root/fx221/localization/aachen_v1_1/global_seg_instance/remap
 save_root=$root/fx221/exp/shloc/aachen
 
-#feat=sgd2nb-20210709211950-d32-sdsssf-ms-n4096-r1024-0001
-#feat=superpoint-n4096-r1024
-#feat=superpoint-n4096-r1024-mask
-#feat=r2d2-n4096-r1024-mask
-#feat=r2d2-rmax1600-10k
-#feat=r2d2-rmax1600-10k-mask
-#feat=resnete2-ms-n4096-r1600-001-mask
-#feat=resnete2-ap-ms-n4096-r1600-001
-
 #feat=resnete2-ms-n10000-r1600-0005-mask
 #feat=resnete2-n4096-r1600-0005-mask
 
@@ -62,11 +53,6 @@ save_dir=/scratches/flyer_2/fx221/exp/shloc/aachen/$weight_name/loc_by_seg
 
 #query_pair="/home/mifs/fx221/Research/Code/Hierarchical-Localization/pairs/aachen_v1.1/pairs-query-netvlad50.txt"
 query_pair="/data/cornucopia/fx221/localization/outputs_hloc/aachen_v1.1/pairs-query-netvlad50.txt"
-#query_pair="/scratch2/fx221/exp/shloc/aachen/2021_08_29_12_49_48_aachen_pspf_resnext101_32x4d_d4_u8_b16_R256_E120_ceohem_adam_seg_cls_aug_stylized/pairs-query-db-feat-max50.txt"
-#query_pair=None
-#query_pair=$root/fx221/exp/shloc/aachen/$weight_name/2021_10_12_01_09_42_aachen_netvlad_B3_R256_E60_D1024_max_ap_P16_N79_proj_kr/pairs_epoch39_netvlad_50.txt
-#query_pair=$root/fx221/exp/shloc/aachen/$weight_name/Oct05_13-34-38_vgg16_netvlad_D512_R512/pairs_epoch22_vgg16_50.txt
-#query_pair="nv_256_50.txt"
 
 
 
@@ -139,6 +125,3 @@ python3 -m localization.hloc \
     --opt_thresh $opt_thresh \
     --opt_type $opt_type \
     --do_covisible_opt
-#    \
-#    --retrieval $query_pair \
-#     --do_covisible_opt \

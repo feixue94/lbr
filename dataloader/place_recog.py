@@ -6,7 +6,6 @@
 @Date   23/08/2021 20:47
 =================================================='''
 import torch.utils.data as data
-from torch.utils.data.dataloader import *
 import os.path as osp
 import cv2
 import random
