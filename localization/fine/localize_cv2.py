@@ -9,9 +9,6 @@ import pickle
 import pycolmap
 import cv2
 from copy import deepcopy
-import matplotlib.pyplot as plt
-import os
-import math
 import os.path as osp
 from scipy.spatial.transform import Rotation as sciR
 from tools.common import sort_dict_by_value
@@ -21,114 +18,9 @@ from localization.utils.parsers import (
     parse_image_lists_with_intrinsics, parse_retrieval, names_to_pair)
 
 from localization.fine.matcher import Matcher, confs
-from localization.p3d.projection import reproject, reproject_fromR, calc_depth, ColmapQ2R, compute_pose_error
-# from localization.p3d.projection import draw_camera
-from localization.p3d.ploter import plot_matches, plot_reprojpoint2D
+from localization.tools import reproject, reproject_fromR, calc_depth, ColmapQ2R, compute_pose_error
+from localization.tools import plot_matches, plot_reprojpoint2D
 from tools.common import resize_img
-
-
-# def calc_uncertainty(mkp, mp3d, qvec, tvec, camera, r_samples=[0], t_samples=[0]):
-#     cmap = plt.get_cmap('jet')
-#     R = sciR.from_quat(quat=[qvec[1], qvec[2], qvec[3], qvec[0]]).as_dcm()
-# 
-#     H = camera['height']
-#     W = camera['width']
-# 
-#     results = {}
-#     n_sample = 0
-#     all_probs = []
-#     for rx in r_samples:
-#         for ry in r_samples:
-#             for rz in r_samples:
-#                 for tx in t_samples:
-#                     for ty in t_samples:
-#                         for tz in t_samples:
-#                             dR = sciR.from_euler('zyx', [rz, ry, rx], degrees=True).as_dcm()
-#                             # print(dR)
-#                             # print(dR.shape)
-#                             dt = np.array([tx, ty, tz], np.float).reshape(3, 1)
-#                             nR = R @ dR
-#                             nt = tvec.reshape(3, 1) + dt
-#                             proj_kp = reproject_fromR(points3D=mp3d, rot=nR, tvec=nt, camera=camera)
-#                             mask = (proj_kp[:, 0] >= 0) * (proj_kp[:, 0] <= W) * (proj_kp[:, 1] >= 0) * (
-#                                     proj_kp[:, 1] < H)
-#                             proj_error = (proj_kp - mkp) ** 2
-#                             proj_error = np.sqrt(proj_error[:, 0] + proj_error[:, 1]) / 20.0
-#                             # sum_proj = np.sum(proj_error[mask])
-#                             # prob = np.exp(-sum_proj)
-#                             prob = np.exp(-np.median(proj_error))
-# 
-#                             results[n_sample] = {
-#                                 'rt': (rx, ry, rz, tx, ty, tz),
-#                                 'prob': prob,
-#                                 'proj_error': proj_error,
-#                                 'Pcw': np.hstack([dR.reshape(3, 3), dt.reshape(3, 1)]),
-#                                 'rgb': cmap(prob),
-#                             }
-#                             n_sample += 1
-# 
-#                             print('prob: ', prob)
-#                             all_probs.append(prob)
-#     print('all_porbs: ', np.min(all_probs), np.median(all_probs), np.max(all_probs))
-#     # exit(0)
-# 
-#     # visualize camera poses
-#     pangolin.CreateWindowAndBind('Main', 640, 480)
-#     gl.glEnable(gl.GL_DEPTH_TEST)
-#     gl.glEnable(gl.GL_BLEND)
-#     gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
-# 
-#     # Define Projection and initial ModelView matrix
-#     scam = pangolin.OpenGlRenderState(
-#         pangolin.ProjectionMatrix(1024, 1024, 2000, 2000, 512, 512, 0.1, 1000),
-#         pangolin.ModelViewLookAt(0, -100, -0.1, 0, 0, 0, 0.0, -1.0, 0.0))
-#     handler = pangolin.Handler3D(scam)
-# 
-#     # Create Interactive View in window
-#     dcam = pangolin.CreateDisplay()
-#     dcam.SetBounds(0.0, 1.0, 0.0, 1.0, -640.0 / 480.0)
-#     dcam.SetHandler(handler)
-# 
-#     # Twc = pangolin.OpenGlMatrix.SetIdentity()
-#     while not pangolin.ShouldQuit():
-#         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
-#         gl.glClearColor(1.0, 1.0, 1.0, 1.0)
-#         dcam.Activate(scam)
-# 
-#         # Render OpenGL Cube
-#         # pangolin.glDrawColouredCube()
-# 
-#         # Draw Point Cloud
-#         # points = np.random.random((100000, 3)) * 10
-#         # gl.glPointSize(2)
-#         # gl.glColor3f(1.0, 0.0, 0.0)
-#         # pangolin.DrawPoints(points)
-# 
-#         for v in results.keys():
-#             Pcw = results[v]['Pcw']
-#             twc = - (Pcw[0:3, 0:3]).transpose() @ Pcw[0:3, -1]
-#             Rwc = (Pcw[:3, 0:3]).transpose()
-#             Pwc = np.eye(4, dtype=np.float64)
-#             Pwc[0:3, 0:3] = Rwc
-#             Pwc[0:3, -1] = twc
-#             rgb = results[v]['rgb']
-#             # twc = twc.astype(np.float64)
-#             # print('twc: ', twc, type(twc))
-#             draw_camera(Twc=Pwc.transpose(), color=(rgb[0], rgb[1], rgb[2]), camera_size=0.01, linewidth=2)
-# 
-#         pangolin.FinishFrame()
-
-# def quaternion_angular_error(q1, q2):
-#     """
-#     angular error between two quaternions
-#     :param q1: (4, )
-#     :param q2: (4, )
-#     :return:
-#     """
-#     d = abs(np.dot(q1, q2))
-#     d = min(1.0, max(-1.0, d))
-#     theta = 2 * np.arccos(d) * 180 / np.pi
-#     return theta
 
 
 def is_cluster(H, W, points2D, radius=50, ratio=0.6):
@@ -2560,38 +2452,6 @@ def pose_from_cluster_with_matcher_hloc(qname, qinfo, db_ids, db_images, points3
                                                  '-'))),
                                     img_match)
 
-                    #### visualize the 3D map & reference db image
-                    show_3D = False
-                    if show_3D:
-                        print("db_seg_dir: ", osp.join(seg_dir, dbname.replace('jpg', 'png')))
-                        db_seg = cv2.imread(osp.join(seg_dir, dbname.replace('jpg', 'png')))
-                        if q_seg is not None and db_seg is not None:
-                            q_seg = cv2.resize(q_seg, dsize=(q_img.shape[1], q_img.shape[0]),
-                                               interpolation=cv2.INTER_NEAREST)
-                            db_seg = cv2.resize(db_seg, dsize=(db_img.shape[1], db_img.shape[0]),
-                                                interpolation=cv2.INTER_NEAREST)
-                            seg_match = plot_matches(img1=q_seg, img2=db_seg, pts1=matched_mkpq, pts2=matched_mkdb,
-                                                     # inliers=np.array([True for i in range(matched_mkpq.shape[0])], np.uint8),
-                                                     inliers=np.array([], np.uint8),
-                                                     )
-                            seg_match = cv2.resize(seg_match, None, fx=0.5, fy=0.5)
-                            img_match = np.hstack([img_raw, seg_match, img_match])
-                        Visualize3DMap(ref_db_ids=all_ref_db_ids,
-                                       points3D=points3D, db_images=db_images,
-                                       q_qvec=ret['qvec'], q_tvec=ret['tvec'],
-                                       ref_db_id=db_name_to_id[dbname],
-                                       img=img_match)
-
-                        vis_3D = {
-                            "img_match": img_match,
-                            "all_Ref_db_ids": all_ref_db_ids,
-                            "ref_db_id": db_name_to_id[dbname],
-                            "q_qvec": ret['qvec'],
-                            "q_tvec": ret['tvec'],
-                        }
-                        np.save(qname.replace('/', '-') + ".npy", vis_3D)
-                        break
-
             return ret['qvec'], ret['tvec'], ret['num_inliers'], {**best_results, **{'log_info': log_info}}
 
     closest = db_images[db_ids[0][0]]
@@ -3236,15 +3096,6 @@ if __name__ == '__main__':
                 l = l.strip().split(' ')
                 if l[0] not in query_list:
                     query_list.append(l[0])
-        # query_list = []
-        # # query_list_fn = "/data/cornucopia/fx221/exp/shloc/aachen/2021_08_22_12_03_06_aachen_pspf_resnext101_32x4d_d4_u8_b16_R256_ceohem_adam_seg_cls_aug_stylized/loc_by_seg/r2d2-rmax1600-10k-aachen_loc_by_seg_451_feat_max_l10_top5_p3_r3_sinlge_v3_th10_order_more_than_1.txt"
-        # query_list_fn = "/data/cornucopia/fx221/exp/shloc/aachen/2021_08_23_18_10_31_aachen_pspf_resnext101_32x4d_d4_u8_b16_R256_E120_ceohem_adam_seg_cls_aug_stylized/loc_by_seg/r2d2-rmax1600-10k--aachen_loc_by_seg_451_feat_max_l10_top5_p3_r3_sinlge_v3_th10.txt.failed"
-        # # with open('failed_cases_451_rec_b16.txt', 'r') as f:
-        # with open(query_list_fn, 'r') as f:
-        #     lines = f.readlines()
-        #     for l in lines:
-        #         l = l.strip().split(' ')
-        #         query_list.append(l[0])
 
         log_fn = args.log_fn + '_th' + str(args.inlier_th)
         vis_dir = args.vis_dir + '_th' + str(args.inlier_th)

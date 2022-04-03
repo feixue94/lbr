@@ -6,14 +6,11 @@
 # @Software: PyCharm
 
 import numpy as np
-import os
-import os.path as osp
 import cv2
-import matplotlib.pyplot as plt
-from localization.utm import from_latlon
-import py360convert
 import torch
+from copy import copy
 from scipy.spatial.transform import Rotation as sciR
+
 
 
 def compute_pose_error(pred_qcw, pred_tcw, gt_qcw, gt_tcw):
@@ -88,29 +85,6 @@ def assign_gps_by_interpolation(query_fns, base_gps):
             print("fn, left_fn, right_fn", fn_id, left_id, right_id)
             query_gps[fn] = fn_gps
     return query_gps
-
-
-def plot_landmarks_from_gps(gps, center=None):
-    """
-    :param gps:[N, 2] [lat, lng]
-    :return:
-    """
-    utms = np.zeros_like(gps)
-    for i in range(gps.shape[0]):
-        x, y, _, _ = from_latlon(latitude=gps[i, 0], longitude=gps[i, 1])
-        utms[i, 0] = x
-        utms[i, 1] = y
-
-    print(np.mean(utms, axis=0))
-    if center is not None:
-        utms = utms - center
-    else:
-        utms = utms - np.mean(utms, axis=0)
-    plt.figure(dpi=200)
-    plt.plot(utms[:, 0], utms[:, 1], 'ob', markersize=1, )
-    # markerfacecolor="red", markeredgewidth=6, markeredgecolor="grey")
-    plt.savefig("gps.png")
-    plt.show()
 
 
 def plot_keypoint(img_path, pts, scores=None, tag=None, save_path=None):
@@ -213,18 +187,6 @@ def read_retrieval_results(path):
     return output
 
 
-def read_img(path, color_type=cv2.IMREAD_COLOR, type="cube"):
-    img = cv2.imread(path, color_type)
-
-    if type == "cube":
-        if len(img.shape) == 2:
-            img = img[:, :, None]
-        face_w = img.shape[0] // 2
-        img_cubes = py360convert.e2c(img, cube_format='dice', face_w=face_w, mode="bilinear")
-        img = img_cubes[face_w:face_w * 2]
-    return img
-
-
 def nn_k(query_gps, db_gps, k=20):
     q = torch.from_numpy(query_gps)  # [N 2]
     db = torch.from_numpy(db_gps)  # [M, 2]
@@ -249,25 +211,228 @@ def quaternion_angular_error(q1, q2):
     return theta
 
 
-if __name__ == '__main__':
-    root = "/home/mifs/fx221/data/cam_street_view"
-    query_img_path = "camvid_360_cvpr18_P2_training_data/images_hand"
-    query_base_gps_file = "P2_training_gps.csv"
-    query_base_gps = {}
-    with open(osp.join(root, query_base_gps_file), "r") as f:
-        lines = f.readlines()
-        for l in lines:
-            l = l.strip("\n").split(',')
-            fn, lat, lng = l[0], float(l[1]), float(l[2])
-            # query_base_gps[fn] = from_latlon(latitude=lat, longitude=lng)[0:2]
-            query_base_gps[fn] = (lat, lng)
-            # lat 52.196802, lng 0.130194
+def plot_matches(img1, img2, pts1, pts2, inliers, horizon=False, plot_outlier=False, confs=None, plot_match=True):
+    rows1 = img1.shape[0]
+    cols1 = img1.shape[1]
+    rows2 = img2.shape[0]
+    cols2 = img2.shape[1]
+    r = 3
+    if horizon:
+        img_out = np.zeros((max([rows1, rows2]), cols1 + cols2, 3), dtype='uint8')
+        # Place the first image to the left
+        img_out[:rows1, :cols1] = img1
+        # Place the next image to the right of it
+        img_out[:rows2, cols1:] = img2  # np.dstack([img2, img2, img2])
 
-    query_img_lists = os.listdir(osp.join(root, query_img_path))
-    query_gps = assign_gps_by_interpolation(query_fns=query_img_lists, base_gps=query_base_gps)
+        if not plot_match:
+            return cv2.resize(img_out, None, fx=0.5, fy=0.5)
+        # for idx, pt in enumerate(pts1):
+        #     img_out = cv2.circle(img_out, (int(pt[0]), int(pt[1])), r, (0, 0, 255), 2)
+        # for idx, pt in enumerate(pts2):
+        #     img_out = cv2.circle(img_out, (int(pt[0] + cols1), int(pt[1])), r, (0, 0, 255), 2)
+        for idx in range(inliers.shape[0]):
+            # if idx % 10 > 0:
+            #     continue
+            if inliers[idx]:
+                color = (0, 255, 0)
+            else:
+                if not plot_outlier:
+                    continue
+                color = (0, 0, 255)
+            pt1 = pts1[idx]
+            pt2 = pts2[idx]
 
-    with open("camvid_360_cvpr18_P2_training_data_prop_interpolation_gps.txt", "w") as f:
-        for fn in sorted(query_gps.keys()):
-            gps = query_gps[fn]
-            text = "{:s} {:.10f} {:.10f}".format(fn, gps[0], gps[1])
-            f.write(text + "\n")
+            if confs is not None:
+                nr = int(r * confs[idx])
+            else:
+                nr = r
+            img_out = cv2.circle(img_out, (int(pt1[0]), int(pt1[1])), nr, color, 2)
+
+            img_out = cv2.circle(img_out, (int(pt2[0]) + cols1, int(pt2[1])), nr, color, 2)
+
+            img_out = cv2.line(img_out, (int(pt1[0]), int(pt1[1])), (int(pt2[0]) + cols1, int(pt2[1])), color,
+                               2)
+    else:
+        img_out = np.zeros((rows1 + rows2, max([cols1, cols2]), 3), dtype='uint8')
+        # Place the first image to the left
+        img_out[:rows1, :cols1] = img1
+        # Place the next image to the right of it
+        img_out[rows1:, :cols2] = img2  # np.dstack([img2, img2, img2])
+
+        if not plot_match:
+            return cv2.resize(img_out, None, fx=0.5, fy=0.5)
+        # for idx, pt in enumerate(pts1):
+        #     img_out = cv2.circle(img_out, (int(pt[0]), int(pt[1])), r, (0, 0, 255), 2)
+        # for idx, pt in enumerate(pts2):
+        #     img_out = cv2.circle(img_out, (int(pt[0]), int(pt[1] + rows1)), r, (0, 0, 255), 2)
+        for idx in range(inliers.shape[0]):
+            # print("idx: ", inliers[idx])
+            # if idx % 10 > 0:
+            #     continue
+            if inliers[idx]:
+                color = (0, 255, 0)
+            else:
+                if not plot_outlier:
+                    continue
+                color = (0, 0, 255)
+
+            if confs is not None:
+                nr = int(r * confs[idx])
+            else:
+                nr = r
+
+            pt1 = pts1[idx]
+            pt2 = pts2[idx]
+            img_out = cv2.circle(img_out, (int(pt1[0]), int(pt1[1])), r, color, 2)
+
+            img_out = cv2.circle(img_out, (int(pt2[0]), int(pt2[1]) + rows1), r, color, 2)
+
+            img_out = cv2.line(img_out, (int(pt1[0]), int(pt1[1])), (int(pt2[0]), int(pt2[1]) + rows1), color,
+                               2)
+
+    img_rs = cv2.resize(img_out, None, fx=0.5, fy=0.5)
+
+    # img_rs = cv2.putText(img_rs, 'matches: {:d}'.format(len(inliers.shape[0])), (50, 50), cv2.FONT_HERSHEY_COMPLEX, 2,
+    #                      (0, 0, 255), 2)
+
+    # if save_fn is not None:
+    #     cv2.imwrite(save_fn, img_rs)
+    # cv2.imshow("match", img_rs)
+    # cv2.waitKey(0)
+    return img_rs
+
+
+def plot_reprojpoint2D(img, points2D, reproj_points2D, confs=None):
+    img_out = copy(img)
+    r = 5
+    for i in range(points2D.shape[0]):
+        p = points2D[i]
+        rp = reproj_points2D[i]
+
+        if confs is not None:
+            nr = int(r * confs[i])
+        else:
+            nr = r
+
+        if nr >= 50:
+            nr = 50
+        # img_out = cv2.circle(img_out, (int(p[0]), int(p[1])), nr, color=(0, 255, 0), thickness=2)
+        img_out = cv2.circle(img_out, (int(rp[0]), int(rp[1])), nr, color=(0, 0, 255), thickness=3)
+        img_out = cv2.circle(img_out, (int(rp[0]), int(rp[1])), 2, color=(0, 0, 255), thickness=3)
+        # img_out = cv2.line(img_out, pt1=(int(p[0]), int(p[1])), pt2=(int(rp[0]), int(rp[1])), color=(0, 0, 255),
+        #                    thickness=2)
+
+
+    return img_out
+
+
+def undistort(points2D, camera_params):
+    if camera_params['camera_model'] == 'SIMPLE_RADIAL':  # f, cx, cy, k
+        pass
+
+
+def reproject_fromR(points3D, rot, tvec, camera):
+    proj_2d = rot @ points3D.transpose() + tvec.reshape(3, 1)
+
+    if camera['model'] == 'SIMPLE_RADIAL':
+        f = camera['params'][0]
+        cx = camera['params'][1]
+        cy = camera['params'][2]
+        k = camera['params'][3]
+
+    proj_2d = proj_2d[0:2, :] / proj_2d[2, :]
+    r2 = proj_2d[0, :] ** 2 + proj_2d[1, :] ** 2
+    radial = r2 * k
+    du = proj_2d[0, :] * radial
+    dv = proj_2d[1, :] * radial
+
+    u = proj_2d[0, :] + du
+    v = proj_2d[1, :] + dv
+    u = u * f + cx
+    v = v * f + cy
+    uvs = np.vstack([u, v]).transpose()
+
+    return uvs
+
+
+def calc_depth(points3D, rvec, tvec, camera):
+    rot = sciR.from_quat(quat=[rvec[1], rvec[2], rvec[3], rvec[0]]).as_dcm()
+    # print('p3d: ', points3D.shape, rot.shape, rot)
+    proj_2d = rot @ points3D.transpose() + tvec.reshape(3, 1)
+
+    return proj_2d.transpose()[:, 2]
+
+
+def reproject(points3D, rvec, tvec, camera):
+    '''
+    Args:
+        points3D: [N, 3]
+        rvec: [w, x, y, z]
+        tvec: [x, y, z]
+    Returns:
+    '''
+    # print('camera: ', camera)
+    # print('p3d: ', points3D.shape)
+    rot = sciR.from_quat(quat=[rvec[1], rvec[2], rvec[3], rvec[0]]).as_dcm()
+    # print('p3d: ', points3D.shape, rot.shape, rot)
+    proj_2d = rot @ points3D.transpose() + tvec.reshape(3, 1)
+
+    if camera['model'] == 'SIMPLE_RADIAL':
+        f = camera['params'][0]
+        cx = camera['params'][1]
+        cy = camera['params'][2]
+        k = camera['params'][3]
+
+    proj_2d = proj_2d[0:2, :] / proj_2d[2, :]
+    r2 = proj_2d[0, :] ** 2 + proj_2d[1, :] ** 2
+    radial = r2 * k
+    du = proj_2d[0, :] * radial
+    dv = proj_2d[1, :] * radial
+
+    u = proj_2d[0, :] + du
+    v = proj_2d[1, :] + dv
+    u = u * f + cx
+    v = v * f + cy
+    uvs = np.vstack([u, v]).transpose()
+
+    return uvs
+
+
+def quaternion_angular_error(q1, q2):
+    """
+    angular error between two quaternions
+    :param q1: (4, )
+    :param q2: (4, )
+    :return:
+    """
+    d = abs(np.dot(q1, q2))
+    d = min(1.0, max(-1.0, d))
+    theta = 2 * np.arccos(d) * 180 / np.pi
+    return theta
+
+
+def ColmapQ2R(qvec):
+    rot = sciR.from_quat(quat=[qvec[1], qvec[2], qvec[3], qvec[0]]).as_dcm()
+    return rot
+
+
+def compute_pose_error(pred_qcw, pred_tcw, gt_qcw, gt_tcw):
+    pred_Rcw = sciR.from_quat(quat=[pred_qcw[1], pred_qcw[2], pred_qcw[3], pred_qcw[0]]).as_dcm()
+    pred_tcw = np.array(pred_tcw, float).reshape(3, 1)
+    pred_Rwc = pred_Rcw.transpose()
+    pred_twc = -pred_Rcw.transpose() @ pred_tcw
+
+    gt_Rcw = sciR.from_quat(quat=[gt_qcw[1], gt_qcw[2], gt_qcw[3], gt_qcw[0]]).as_dcm()
+    gt_tcw = np.array(gt_tcw, float).reshape(3, 1)
+    gt_Rwc = gt_Rcw.transpose()
+    gt_twc = -gt_Rcw.transpose() @ gt_tcw
+
+    t_error_xyz = pred_twc - gt_twc
+    t_error = np.sqrt(np.sum(t_error_xyz ** 2))
+
+    pred_qwc = sciR.from_quat(quat=[pred_qcw[1], pred_qcw[2], pred_qcw[3], pred_qcw[0]]).as_quat()
+    gt_qwc = sciR.from_quat(quat=[gt_qcw[1], gt_qcw[2], gt_qcw[3], gt_qcw[0]]).as_quat()
+
+    q_error = quaternion_angular_error(q1=pred_qwc, q2=gt_qwc)
+
+    return q_error, t_error, (t_error_xyz[0, 0], t_error_xyz[1, 0], t_error_xyz[2, 0])
