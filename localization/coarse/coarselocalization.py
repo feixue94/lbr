@@ -105,6 +105,7 @@ class CoarseLocalization:
         fn_gids = {}
         cv2.namedWindow("img", cv2.WINDOW_NORMAL)
         for fn in tqdm(imglist, total=len(imglist)):
+            # print(osp.join(seg_dir, fn.replace("jpg", "png")))
             seg_img = cv2.imread(osp.join(seg_dir, fn.replace("jpg", "png")))
             # if not osp.exists(seg_img):
             #     continue
@@ -372,7 +373,8 @@ class CoarseLocalization:
                     if c in db_feats.keys():
                         c_feat = db_feats[c]
                     else:
-                        c_feat = np.load(osp.join(db_feat_dir, c.split('.')[0] + '.npy'), allow_pickle=True).item()[feat_type]
+                        c_feat = np.load(osp.join(db_feat_dir, c.split('.')[0] + '.npy'), allow_pickle=True).item()[
+                            feat_type]
                         # c_feat = c_feat - np.mean(c_feat)
                         c_norm = np.linalg.norm(c_feat)
                         c_feat = c_feat / c_norm
@@ -403,8 +405,9 @@ class CoarseLocalization:
                 break
         return results
 
-    def loc_by_rec_v3_avg_single(self, q_uids, query_feat, db_feats, db_feat_dir, k=5, q_uids_confs=None, feat_type=None,
-                          log_info=None):
+    def loc_by_rec_v3_avg_single(self, q_uids, query_feat, db_feats, db_feat_dir, k=5, q_uids_confs=None,
+                                 feat_type=None,
+                                 log_info=None):
         # step 1: find candidates with predicted labels
         fn_couids = {}
 
@@ -442,7 +445,8 @@ class CoarseLocalization:
                     if c in db_feats.keys():
                         c_feat = db_feats[c]
                     else:
-                        c_feat = np.load(osp.join(db_feat_dir, c.split('.')[0] + '.npy'), allow_pickle=True).item()[feat_type]
+                        c_feat = np.load(osp.join(db_feat_dir, c.split('.')[0] + '.npy'), allow_pickle=True).item()[
+                            feat_type]
                         # c_feat = c_feat - np.mean(c_feat)
                         c_norm = np.linalg.norm(c_feat)
                         c_feat = c_feat / c_norm
@@ -464,8 +468,9 @@ class CoarseLocalization:
                 results.append((can_fns[pred_idxs[0, i]], pred_dists[0, i].cpu().numpy()))
         return results
 
-    def loc_by_rec_v3_avg_cluster(self, query_seg, query_feat, db_feats, db_feat_dir, k=5, q_uids_confs=None, feat_type=None,
-                          log_info=None, k_rec=50):
+    def loc_by_rec_v3_avg_cluster(self, query_seg, query_feat, db_feats, db_feat_dir, k=5, q_uids_confs=None,
+                                  feat_type=None,
+                                  log_info=None, k_rec=50):
         seg_img = cv2.resize(query_seg, dsize=(256, 256), interpolation=cv2.INTER_NEAREST)
         gids = np.int32(seg_img[:, :, 2]) * 256 * 256 + np.int32(seg_img[:, :, 1]) * 256 + np.int32(
             seg_img[:, :, 0])
@@ -516,7 +521,8 @@ class CoarseLocalization:
                     if c in db_feats.keys():
                         c_feat = db_feats[c]
                     else:
-                        c_feat = np.load(osp.join(db_feat_dir, c.split('.')[0] + '.npy'), allow_pickle=True).item()[feat_type]
+                        c_feat = np.load(osp.join(db_feat_dir, c.split('.')[0] + '.npy'), allow_pickle=True).item()[
+                            feat_type]
                         # c_feat = c_feat - np.mean(c_feat)
                         c_norm = np.linalg.norm(c_feat)
                         c_feat = c_feat / c_norm
@@ -609,129 +615,6 @@ class CoarseLocalization:
         for i in range(topk):
             results.append((can_fns[pred_idxs[0, i]], pred_dists[0, i].cpu().numpy()))
         return results
-
-
-def prediction_to_labels(pred_conf, pred_labels, cnt_th=2000, cnt_labels=5, map_gid_rgb=None):
-    topk = pred_conf.shape[0]
-    final_label = np.zeros(shape=(256, 256), dtype=np.int)
-    final_conf = np.zeros(shape=(256, 256), dtype=np.float)
-    nlabels = 0
-    q_uids = []
-
-    puid_conf = {}
-    for i in range(topk):
-        label = pred_labels[i]
-        conf = pred_conf[i]
-        conf = cv2.resize(conf, dsize=(256, 256), interpolation=cv2.INTER_NEAREST)
-        label = cv2.resize(label, dsize=(256, 256), interpolation=cv2.INTER_NEAREST)
-        mask_conf = (conf < 1e-4)
-        label[mask_conf] = 0
-        # seg = label_to_bgr(label=label, maps=map_gid_rgb)
-        uids = np.unique(label).tolist()
-        valid_uids = [v for v in uids if v > 0]
-        # print('i: pred_labels: ', i, valid_uids)
-        gid_conf = {}
-
-        for v in valid_uids:
-            if v in q_uids:
-                continue
-            # cnt = np.sum(label == v)
-            cf = np.mean(conf[label == v])
-            gid_conf[v] = cf
-
-        sorted_gid_conf = sort_dict_by_value(data=gid_conf, reverse=True)
-
-        new_label = np.zeros_like(label)
-        new_conf = np.zeros_like(conf)
-        for v, c in sorted_gid_conf:
-
-            if v not in puid_conf.keys():
-                puid_conf[v] = c
-            if v not in q_uids:
-                q_uids.append(v)
-
-            mask = (label == v)
-            new_label[mask] = v
-            new_conf[mask] = conf[mask]
-            nlabels += 1
-            if nlabels >= cnt_labels:
-                break
-
-        # new_seg = label_to_bgr(label=new_label, maps=map_gid_rgb)
-        # cv2.imshow('seg{:d}'.format(i + 1), new_seg)
-        # cv2.waitKey(0)
-
-        empty_mask = (final_label == 0)
-        final_label[empty_mask] = new_label[empty_mask]
-        final_conf[empty_mask] = new_conf[empty_mask]
-
-        cnt = np.sum(final_label > 0)
-        # print('cnt: ', cnt)
-        fuids = np.unique(final_label).tolist()
-        fuids = [v for v in fuids if v > 0]
-        nuids = len(fuids)
-
-        # if i == 0:
-        #     if cnt > cnt_th:
-        #         print("topk: ", i, cnt, nuids)
-        #         return final_conf, final_label, q_uids, puid_conf
-        # else:
-        # if cnt > cnt_th and nuids >= cnt_labels:
-        if nuids >= cnt_labels:
-            print("topk: ", i, cnt, nuids)
-            return final_conf, final_label, q_uids, puid_conf
-    return final_conf, final_label, q_uids, puid_conf
-
-
-def prediction_to_labels_v2(pred_conf, pred_labels, cnt_th=2000, cnt_labels=5, map_gid_rgb=None):
-    topk = pred_conf.shape[0]
-    puid_conf = {}
-    puid_mask = {}
-    for i in range(topk):
-        label = pred_labels[i]
-        conf = pred_conf[i]
-        conf = cv2.resize(conf, dsize=(256, 256), interpolation=cv2.INTER_NEAREST)
-        label = cv2.resize(label, dsize=(256, 256), interpolation=cv2.INTER_NEAREST)
-        mask_conf = (conf < 1e-4)
-        label[mask_conf] = 0
-        # seg = label_to_bgr(label=label, maps=map_gid_rgb)
-        uids = np.unique(label).tolist()
-        valid_uids = [v for v in uids if v > 0]
-
-        for v in valid_uids:
-            mask = (label == v)
-            cf = np.mean(conf[mask])
-            if v in puid_conf.keys():
-                if cf > puid_conf[v]:
-                    puid_conf[v] = cf
-                    puid_mask[v] = mask
-            else:
-                puid_conf[v] = cf
-                puid_mask[v] = mask
-
-    print('Find {:d} global instances'.format(len(puid_conf.keys())))
-
-    final_label = np.zeros(shape=(256, 256), dtype=np.int)
-    final_conf = np.zeros(shape=(256, 256), dtype=np.float)
-    final_puid_conf = {}
-    sorted_puid_conf = sort_dict_by_value(data=puid_conf, reverse=True)
-    final_uids = []
-    for v in sorted_puid_conf:
-        uid = v[0]
-        cf = v[1]
-        mask_v = puid_mask[uid]
-        final_puid_conf[uid] = cf
-
-        mask = (final_label == 0) * mask_v
-        final_label[mask] = uid
-        final_conf[mask] = cf
-
-        final_uids.append(uid)
-
-        # if len(final_uids) >= cnt_labels:
-        #     break
-
-    return final_conf, final_label, final_uids, final_puid_conf
 
 
 def prediction_to_labels_v3(pred_conf, pred_labels, cnt_th=2000, cnt_labels=5, map_gid_rgb=None):

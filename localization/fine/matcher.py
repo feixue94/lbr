@@ -16,7 +16,7 @@ import pprint
 import cv2
 import os
 import os.path as osp
-from localization.fine.superglue.superglue import SuperGlue
+# from localization.fine.superglue.superglue import SuperGlue
 from localization.tools import plot_matches
 
 

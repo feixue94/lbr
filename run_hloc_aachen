@@ -52,7 +52,8 @@ weight_name=2021_08_29_12_49_48_aachen_pspf_resnext101_32x4d_d4_u8_b16_R256_E120
 save_dir=/scratches/flyer_2/fx221/exp/shloc/aachen/$weight_name/loc_by_seg
 
 #query_pair="/home/mifs/fx221/Research/Code/Hierarchical-Localization/pairs/aachen_v1.1/pairs-query-netvlad50.txt"
-query_pair="/data/cornucopia/fx221/localization/outputs_hloc/aachen_v1.1/pairs-query-netvlad50.txt"
+#query_pair="/data/cornucopia/fx221/localization/outputs_hloc/aachen_v1.1/pairs-query-netvlad50.txt"
+query_pair="datasets/aachen/pairs-query-netvlad50.txt"
 
 
 
@@ -97,9 +98,6 @@ python3 -m localization.hloc \
     --k_seg $k_seg \
     --k_can $k_can \
     --k_rec $k_rec \
-    --pversion 3 \
-    --rversion 3 \
-    --version $version \
     --retrieval $query_pair \
     --retrieval_type $retrieval_type \
     --feature_type $feature_type \

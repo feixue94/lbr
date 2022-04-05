@@ -154,8 +154,6 @@ def global_search(q_feat, db_feats, topk=50):
 
 
 def run(args):
-    # nv_retrievals = read_retrieval_results(
-    #     path="/home/mifs/fx221/Research/Code/Hierarchical-Localization/pairs/aachen_v1.1/pairs-query-netvlad50.txt")
     gt_pose_fn = '/scratches/flyer_2/fx221/localization/outputs_hloc/aachen_v1_1/Aachen-v1.1_hloc_superpoint_n4096_r1600+superglue_netvlad50.txt'
     gt_poses = {}
     with open(gt_pose_fn, "r") as f:
@@ -174,8 +172,7 @@ def run(args):
 
     print('nv_retrieval: ', len(nv_retrievals.keys()))
 
-    # save_fn = save_fn + 'tstretvgg16d512r512'
-    # save_fn = save_fn + 'day'
+
     # test_cat = 'night'
     test_cat = 'day'
     # save_fn = save_fn + 'test'
@@ -191,13 +188,10 @@ def run(args):
     show_seg = False
 
     feat_type = args.feature_type
-    # feat_type = 'gem_hard_atten'
     k_seg = args.k_seg
     k_can = args.k_can
     k_rec = args.k_rec
     version = args.version
-    pversion = args.pversion
-    rversion = args.rversion
 
     matcher_name = args.matcher_method
     local_feat_name = args.features.as_posix().split("/")[-1].split(".")[0]
@@ -248,15 +242,6 @@ def run(args):
         print('Load global feats from {:s}'.format(q_pred_dir))
         use_global_feat = False
         db_feats = {}
-        # with open(db_imglist_fn, "r") as f:
-        #     lines = f.readlines()
-        #     for l in tqdm(lines, total=len(lines)):
-        #         dbname = l.strip()
-        #         pred = np.load(osp.join(q_pred_dir, dbname.split(".")[0] + ".npy"), allow_pickle=True).item()
-        #         c_feat = pred[feat_type]
-        #         c_norm = np.linalg.norm(c_feat)
-        #         c_feat = c_feat / c_norm
-        #         db_feats[dbname] = c_feat
 
     # preparation for fine localization
     with_label = args.with_label
@@ -294,9 +279,6 @@ def run(args):
         tag = tag + args.opt_type + "th" + str(int(
             args.opt_thresh)) + "r" + str(
             args.radius)
-        if args.opt_type.find("proj") >= 0:
-            if args.with_dist:
-                tag = tag + '_dt'
 
         if args.iters > 0:
             tag = tag + "i" + str(int(args.iters))
@@ -326,78 +308,6 @@ def run(args):
 
     full_log_info = ''
 
-    # if show_seg:
-    #     cv2.namedWindow("q_seg", cv2.WINDOW_NORMAL)
-    #     cv2.namedWindow("db_seg", cv2.WINDOW_NORMAL)
-
-    q_fn_lists_error = [
-        'query/night/nexus5x/IMG_20161227_172456.jpg',
-        'query/night/nexus5x/IMG_20161227_172633.jpg',
-        'query/night/nexus5x/IMG_20161227_173202.jpg',
-        'query/night/nexus5x/IMG_20161227_191029.jpg',
-        'query/night/nexus5x/IMG_20161227_191152.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_003354.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_003514.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_003909.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_003943.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_005046.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_005301.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_005552.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_005747.jpg',
-    ]
-
-    q_fn_lists = [
-        "query/day/milestone/2012-02-11_15-53-21_857.jpg",
-
-    ]
-
-    q_fn_retrieval_failed_list = [
-        'query/day/milestone/2011-09-18_19-48-09_199.jpg',
-        'query/day/milestone/2011-09-18_19-48-15_986.jpg',
-        'query/day/milestone/2011-10-01_14-31-58_416.jpg',
-        'query/day/milestone/2011-10-01_14-33-15_675.jpg',
-        'query/day/milestone/2011-10-01_14-36-23_370.jpg',
-        'query/day/milestone/2011-12-17_14-27-50_531.jpg',
-        'query/day/milestone/2011-12-17_14-51-41_274.jpg',
-        'query/day/milestone/2011-12-17_14-54-02_921.jpg',
-        'query/day/milestone/2011-12-29_15-30-24_502.jpg',
-        'query/day/milestone/2011-12-29_15-38-28_183.jpg',
-        'query/day/milestone/2012-01-28_15-19-08_964.jpg',
-        'query/day/nexus4/IMG_20130302_145337.jpg',
-        'query/day/nexus4/IMG_20140521_134437.jpg',
-        'query/day/nexus4/IMG_20140521_134832.jpg',
-        'query/day/nexus4/IMG_20140521_135234.jpg',
-        'query/day/nexus4/IMG_20140521_135550.jpg',
-        'query/day/nexus4/IMG_20140521_135553.jpg',
-        'query/day/nexus4/IMG_20140521_135701.jpg',
-        'query/day/nexus4/IMG_20140521_135854.jpg',
-        'query/day/nexus4/IMG_20140521_135857.jpg',
-        'query/day/nexus5x/IMG_20161227_160721.jpg',
-        'query/night/nexus5x/IMG_20161227_172456.jpg',
-        'query/night/nexus5x/IMG_20161227_172558.jpg',
-        'query/night/nexus5x/IMG_20161227_172730.jpg',
-        'query/night/nexus5x/IMG_20161227_173137.jpg',
-        'query/night/nexus5x/IMG_20161227_173202.jpg',
-        'query/night/nexus5x/IMG_20161227_191954.jpg',
-        'query/night/nexus5x/IMG_20161227_192026.jpg',
-        'query/night/nexus5x/IMG_20161227_192030.jpg',
-        'query/night/nexus5x/IMG_20161227_192220.jpg',
-        'query/night/nexus5x/IMG_20161227_192300.jpg',
-        'query/night/nexus5x/IMG_20161227_192304.jpg',
-        'query/night/nexus5x/IMG_20161227_192316.jpg',
-        'query/night/nexus5x/IMG_20161227_192330.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_004235.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_004319.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_004435.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_004605.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_004712.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_004806.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_004902.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_005153.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_005420.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_005552.jpg',
-        'query/night/nexus5x_additional_night/IMG_20170702_005747.jpg',
-    ]
     n_q = 0
     success_ratio = [0, 0, 0, 0]
     for qname, qinfo in tqdm(queries):
@@ -411,12 +321,6 @@ def run(args):
         # ]:
         #     continue
 
-        # if qname in ["query/night/nexus5x/IMG_20161227_172658.jpg"]:
-        #     continue
-
-        # if qname not in q_fn_retrieval_failed_list:
-        #     continue
-
         # if qname.find('night') >= 0:
         if qname.find(test_cat) < 0:
             continue
@@ -426,11 +330,6 @@ def run(args):
             # cv2.imshow("q_seg", q_seg)
         else:
             q_seg = None
-
-        # n_q += 1
-        # if n_q <= 11:
-        #     continue
-        # print(n_q, qname)
 
         pred = np.load(osp.join(q_pred_dir, qname.split(".")[0] + ".npy"), allow_pickle=True).item()
         pred_confs = pred["confidence"]
@@ -444,16 +343,10 @@ def run(args):
         # q_feat = q_feat - np.mean(q_feat)
         time_start = time.time()
         q_feat = q_feat / np.linalg.norm(q_feat)
-        if pversion == 2:
-            q_f, q_label, q_uids, q_uid_confs = prediction_to_labels_v2(pred_conf=pred_confs, pred_labels=pred_labels,
-                                                                        cnt_th=5000,
-                                                                        cnt_labels=k_seg,
-                                                                        map_gid_rgb=map_gid_rgb)
-        elif pversion == 3:
-            q_f, q_label, q_uids, q_uid_confs = prediction_to_labels_v3(pred_conf=pred_confs, pred_labels=pred_labels,
-                                                                        cnt_th=5000,
-                                                                        cnt_labels=k_seg,
-                                                                        map_gid_rgb=map_gid_rgb)
+        q_f, q_label, q_uids, q_uid_confs = prediction_to_labels_v3(pred_conf=pred_confs, pred_labels=pred_labels,
+                                                                    cnt_th=5000,
+                                                                    cnt_labels=k_seg,
+                                                                    map_gid_rgb=map_gid_rgb)
         # q_seg = q_seg[:, q_seg.shape[1] // 3:q_seg.shape[1] // 3 * 2, ]
         q_seg = label_to_bgr(label=q_label, maps=map_gid_rgb)
         q_rgb_confs = {}
@@ -712,9 +605,6 @@ if __name__ == '__main__':
     parser.add_argument('--k_seg', type=int, default=10)
     parser.add_argument('--k_can', type=int, default=5)
     parser.add_argument('--k_rec', type=int, default=30)
-    parser.add_argument('--pversion', type=int, default=3)
-    parser.add_argument('--rversion', type=int, default=3)
-    parser.add_argument('--version', type=str, default="v6")
     parser.add_argument('--feature_type', type=str, default="feat_max")
     parser.add_argument('--init_type', type=str, default="single")
     parser.add_argument('--global_score_th', type=float, default=-1.)
@@ -732,5 +622,4 @@ if __name__ == '__main__':
     if args.dataset == "aachen":
         run(args=args)
     elif args.dataset == "robotcar":
-        pass
         run_robotcar(args=args)
