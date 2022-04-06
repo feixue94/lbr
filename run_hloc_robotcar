@@ -66,7 +66,7 @@ radius=20
 obs_thresh=3
 
 # with opt
-python3 -m localization.hloc \
+python3 -m localization.localizer \
     --only_gt $only_gt \
     --retrieval_type $retrieval_type \
     --gt_pose_fn $gt_pose_fn \

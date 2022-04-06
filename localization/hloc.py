@@ -199,10 +199,10 @@ def run_aachen(args):
                                                                      args.init_type,
                                                                      )
     map_gid_rgb = read_seg_map_without_group("datasets/aachen/aachen_grgb_gid_v5.txt")
-    weight_name = args.weight_name
     db_imglist_fn = "datasets/aachen/aachen_db_imglist.txt"
     save_tmp_fn = 'aachen_452'
 
+    weight_name = args.weight_name
     q_pred_dir = osp.join(save_root, weight_name, "confidence")
     seg_dir = osp.join(save_root, weight_name, "masks")
 
@@ -239,7 +239,6 @@ def run_aachen(args):
     if args.with_match:
         matcher = Matcher(conf=confs[args.matcher_method])
         matcher = matcher.eval().cuda()
-
         if args.matcher_method in ['NNM', 'NNMR']:
             with_label = False
 

@@ -6,11 +6,6 @@
 @Email： xuefei@sensetime.com
 """
 
-# Copyright 2019-present NAVER Corp.
-# CC BY-NC-SA 3.0
-# Available only for non-commercial use
-
-import os, pdb  # , shutil
 import numpy as np
 import torch
 import json
@@ -156,9 +151,3 @@ def imgs2video(im_dir, video_dir):
         videoWriter.write(frame)
 
     videoWriter.release()
-
-
-if __name__ == '__main__':
-    img_dir = "/data/cornucopia/fx221/exp/shloc/aachen/2021_08_29_12_49_48_aachen_pspf_resnext101_32x4d_d4_u8_b16_R256_E120_ceohem_adam_seg_cls_aug_stylized/loc_by_seg/lbr_av11_l10_c5_p3_r3_feat_max_v6_feats-resnete2-ms-n4096-r1600-001-mask_NNML_fth0.950_i20.0_r8.0"
-    video_dir = "/data/cornucopia/fx221/exp/shloc/figs/success-aachen-20210829-v1.mp4"
-    imgs2video(im_dir=img_dir, video_dir=video_dir)

@@ -10,14 +10,8 @@ import pycolmap
 import cv2
 from copy import deepcopy
 import os.path as osp
-from scipy.spatial.transform import Rotation as sciR
 from tools.common import sort_dict_by_value
 
-from localization.utils.read_write_model import read_model
-from localization.utils.parsers import (
-    parse_image_lists_with_intrinsics, parse_retrieval, names_to_pair)
-
-from localization.fine.matcher import Matcher, confs
 from localization.tools import reproject, reproject_fromR, calc_depth, ColmapQ2R, compute_pose_error
 from localization.tools import plot_matches, plot_reprojpoint2D
 from tools.common import resize_img
@@ -145,8 +139,8 @@ def get_covisibility_frames_by_pose(frame_id, pred_qvec, pred_tvec, points3D, al
     valid_db_ids = []
     for did in resort_ids:
         valid_db_ids.append(db_ids[did])
-        print('Ref frame {:d}, q_error:{:.3f}, t_error: {:.3f} from pose'.format(len(valid_db_ids), db_q_dists[did],
-                                                                                 db_t_dists[did]))
+        # print('Ref frame {:d}, q_error:{:.3f}, t_error: {:.3f} from pose'.format(len(valid_db_ids), db_q_dists[did],
+        #                                                                          db_t_dists[did]))
         if covisibility_frame > 0:
             if len(valid_db_ids) >= covisibility_frame:
                 break
@@ -334,26 +328,21 @@ def pose_refinement_covisibility(qname, cfg, feature_file, db_frame_id, db_image
     md_error = np.median(proj_error[inlier_mask])
     mx_error = np.max(proj_error[inlier_mask])
 
-    depth = calc_depth(points3D=mp3d, rvec=qvec, tvec=tvec, camera=cfg)
-    mn_depth = np.min(depth[inlier_mask])
-    md_depth = np.median(depth[inlier_mask])
-    mx_depth = np.max(depth[inlier_mask])
+    # depth = calc_depth(points3D=mp3d, rvec=qvec, tvec=tvec, camera=cfg)
+    # mn_depth = np.min(depth[inlier_mask])
+    # md_depth = np.median(depth[inlier_mask])
+    # mx_depth = np.max(depth[inlier_mask])
 
-    # q_diff = quaternion_angular_error(q1=np.array(qvec, np.float).reshape(4, ),
-    #                                   q2=np.array(init_qvec, np.float).reshape(4, ))
-    # t_diff = (np.array(tvec, np.float).reshape(3, 1) - np.array(init_tvec, np.float).reshape(3, 1)) ** 2
-    # t_diff = np.sqrt(np.sum(t_diff))
-    # q_diff, t_diff, _ = compute_pose_error(pred_qcw=qvec, pred_tcw=tvec, gt_qcw=init_qvec, gt_tcw=init_tvec)
-    q_diff, t_diff, _ = compute_pose_error(pred_qcw=qvec, pred_tcw=tvec, gt_qcw=gt_qvec, gt_tcw=gt_tvec)
-    print_text = 'Iter: {:d} inliers: {:d} mn_error: {:.2f}, md_error: {:.2f} mx_error: {:.2f} mn_d:{:.1f} md_d:{:.1f} mx_d:{:.1f}, q_error:{:.1f} t_error:{:.2f}'.format(
+    if gt_qvec is None or gt_tvec is None:
+        q_diff, t_diff, _ = compute_pose_error(pred_qcw=qvec, pred_tcw=tvec, gt_qcw=init_qvec, gt_tcw=init_tvec)
+    else:
+        q_diff, t_diff, _ = compute_pose_error(pred_qcw=qvec, pred_tcw=tvec, gt_qcw=gt_qvec, gt_tcw=gt_tvec)
+    print_text = 'Iter: {:d} inliers: {:d} mn_error: {:.2f}, md_error: {:.2f} mx_error: {:.2f}, q_error:{:.1f} t_error:{:.2f}'.format(
         0,
         ret['num_inliers'],
         mn_error,
         md_error,
         mx_error,
-        mn_depth,
-        md_depth,
-        mx_depth,
         q_diff,
         t_diff,
     )
@@ -384,7 +373,7 @@ def pose_refinement_covisibility(qname, cfg, feature_file, db_frame_id, db_image
             proj_error = (mkpq - proj_mkp) ** 2
             proj_error = np.sqrt(proj_error[:, 0] + proj_error[:, 1])
 
-            depth = calc_depth(points3D=mp3d, rvec=qvec, tvec=tvec, camera=cfg)
+            # depth = calc_depth(points3D=mp3d, rvec=qvec, tvec=tvec, camera=cfg)
             # inlier_mask = np.array(inlier_mask_opt).reshape(-1,)
             inlier_mask = (proj_error <= opt_th)  # np.array(inlier_mask_opt).reshape(-1,)
 
@@ -393,13 +382,15 @@ def pose_refinement_covisibility(qname, cfg, feature_file, db_frame_id, db_image
             md_error = np.median(proj_error[inlier_mask])
             mx_error = np.max(proj_error[inlier_mask])
 
-            mn_depth = np.min(depth[inlier_mask])
-            md_depth = np.median(depth[inlier_mask])
-            mx_depth = np.max(depth[inlier_mask])
+            # mn_depth = np.min(depth[inlier_mask])
+            # md_depth = np.median(depth[inlier_mask])
+            # mx_depth = np.max(depth[inlier_mask])
 
-            q_diff, t_diff, _ = compute_pose_error(pred_qcw=ret['qvec'], pred_tcw=ret['tvec'], gt_qcw=gt_qvec,
-                                                   gt_tcw=gt_tvec)
-            print_text = 'After Iter:{:d} inliers:{:d}/{:d} mn_error:{:.1f}, md_error:{:.1f} mx_error:{:.1f} mn_d:{:.1f} md_d:{:.1f} mx_d:{:.1f}, q_error:{:.1f}, t_error:{:.2f}'.format(
+            if gt_qvec is None or gt_tvec is None:
+                q_diff, t_diff, _ = compute_pose_error(pred_qcw=qvec, pred_tcw=tvec, gt_qcw=init_qvec, gt_tcw=init_tvec)
+            else:
+                q_diff, t_diff, _ = compute_pose_error(pred_qcw=qvec, pred_tcw=tvec, gt_qcw=gt_qvec, gt_tcw=gt_tvec)
+            print_text = 'After Iter:{:d} inliers:{:d}/{:d} mn_error:{:.1f}, md_error:{:.1f} mx_error:{:.1f}, q_error:{:.1f}, t_error:{:.2f}'.format(
                 i + 1,
                 np.sum(
                     inlier_mask),
@@ -407,9 +398,6 @@ def pose_refinement_covisibility(qname, cfg, feature_file, db_frame_id, db_image
                 mn_error,
                 md_error,
                 mx_error,
-                mn_depth,
-                md_depth,
-                mx_depth,
                 q_diff,
                 t_diff
             )
