@@ -13,17 +13,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as tvf
 
-import cv2
-from tools import common
-
 RGB_mean = [0.485, 0.456, 0.406]
 RGB_std = [0.229, 0.224, 0.225]
 
 norm_RGB = tvf.Compose([tvf.Normalize(mean=RGB_mean, std=RGB_std)])
-
-# from tools.dataloader import norm_RGB
-# from nets.patchnet import Quad_L2Net_ConfCFS
-from net.locnets.r2d2 import Quad_L2Net_ConfCFS
 
 
 def load_network(model_fn):

@@ -79,7 +79,7 @@ confs = {
         'weights': 'indoor',
         'keypoint_encoder': [32, 64, 128, 256],
         'GNN_layers': ['self', 'cross'] * 9,
-        'sinkhorn_iterations': 100,
+        'sinkhorn_iterations': 20,
         'match_threshold': 0.2,
     }
 }

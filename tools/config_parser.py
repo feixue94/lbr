@@ -15,7 +15,6 @@ from datetime import datetime
 from tools.common import read_json, write_json, torch_set_gpu
 
 
-
 class ConfigParser:
     def __init__(self, args, options='', timestamp=True, test_only=False):
         # parse default and custom cli options
@@ -26,7 +25,6 @@ class ConfigParser:
         # if args.device:
         #     os.environ["CUDA_VISIBLE_DEVICES"] = args.device
         torch_set_gpu(gpus=args.gpu)
-
 
         self.cfg_fname = Path(args.config)
         # load config file and apply custom cli options
@@ -64,7 +62,8 @@ class ConfigParser:
         return self.config[name]
 
     def get_logger(self, name, verbosity=2):
-        msg_verbosity = 'verbosity option {} is invalid. Valid options are {}.'.format(verbosity, self.log_levels.keys())
+        msg_verbosity = 'verbosity option {} is invalid. Valid options are {}.'.format(verbosity,
+                                                                                       self.log_levels.keys())
         assert verbosity in self.log_levels, msg_verbosity
         logger = logging.getLogger(name)
         logger.setLevel(self.log_levels[verbosity])
@@ -83,6 +82,7 @@ class ConfigParser:
     def log_dir(self):
         return self.__log_dir
 
+
 # helper functions used to update config dict with custom cli options
 def _update_config(config, options, args):
     for opt in options:
@@ -91,15 +91,18 @@ def _update_config(config, options, args):
             _set_by_path(config, opt.target, value)
     return config
 
+
 def _get_opt_name(flags):
     for flg in flags:
         if flg.startswith('--'):
             return flg.replace('--', '')
     return flags[0].replace('--', '')
 
+
 def _set_by_path(tree, keys, value):
     """Set a value in a nested object in tree by sequence of keys."""
     _get_by_path(tree, keys[:-1])[keys[-1]] = value
+
 
 def _get_by_path(tree, keys):
     """Access a nested object in tree by sequence of keys."""

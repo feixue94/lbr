@@ -172,8 +172,6 @@ class CrossEntropy(nn.Module):
         return loss.mean()
 
 
-# cls_criterion = nn.BCEWithLogitsLoss(weight=class_weights)
-
 if __name__ == '__main__':
     target = torch.randint(0, 4, (1, 1, 4, 4)).cuda()
     input = torch.rand((1, 4, 4, 4)).cuda()

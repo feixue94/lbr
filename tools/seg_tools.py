@@ -6,8 +6,6 @@
 @Date   30/04/2021 15:47
 =================================================='''
 
-import torch
-import torch.nn.functional as F
 import numpy as np
 
 
@@ -53,6 +51,7 @@ def label_to_bgr(label, maps):
             bgr = np.array([b, g, r], np.uint8)
         output[label == k] = np.uint8(bgr)
     return output
+
 
 def rgb_to_bgr(img):
     out = np.zeros_like(img)
@@ -100,7 +99,6 @@ def read_seg_map_without_group(path):
             gid = int(l[1])
             map[gid] = grgb
     return map
-
 
 
 ## code is from https://github.com/wkentaro/pytorch-fcn/blob/master/torchfcn/utils.py

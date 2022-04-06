@@ -23,61 +23,6 @@ from localization.tools import plot_matches, plot_reprojpoint2D
 from tools.common import resize_img
 
 
-def is_cluster(H, W, points2D, radius=50, ratio=0.6):
-    assert points2D.shape[0] > 0
-    n_points = np.zeros(shape=(H, W), dtype=np.int)
-    for i in range(points2D.shape[0]):
-        x = int(points2D[i, 0])
-        y = int(points2D[i, 0])
-
-        for ry in range(-radius, radius):
-            for rx in range(-radius, radius):
-                if rx < 0 or rx >= W or ry < 0 or ry >= H:
-                    continue
-
-                n_points[y + ry, x + rx] += 1
-
-    n_most = np.max(n_points)
-
-    return (n_most / points2D.shape[0] >= ratio)
-
-
-def calc_dist(qname, feature_file, db_images, points3D, qid_p3ds, obs_th=0):
-    desc_q = feature_file[qname]['descriptors'].__array__()
-    desc_q = desc_q.transpose()
-
-    all_median_dist = []
-    for qid in qid_p3ds.keys():
-        p3d = qid_p3ds[qid]
-        if p3d == -1:
-            continue
-
-        if len(points3D[p3d].image_ids) < obs_th:
-            continue
-
-        q_desc_i = desc_q[qid]
-        db_ids = points3D[p3d].image_ids
-        all_dist = []
-        for db_id in db_ids:
-            db_3Ds = db_images[db_id].point3D_ids
-            db_name = db_images[db_id].name
-            desc_db = feature_file[db_name]['descriptors'].__array__()
-            desc_db = desc_db.transpose()
-            db_pki = list(db_3Ds).index(p3d)
-            db_desc_i = desc_db[db_pki]
-            dist = q_desc_i @ db_desc_i.reshape(-1, 1)
-            dist = np.sqrt(2 - 2 * dist + 1e-6)
-
-            all_dist.append(dist)
-
-        if len(all_dist) == 0:
-            continue
-
-        all_median_dist.append(np.median(all_dist))
-
-    return np.median(all_median_dist)
-
-
 def do_covisibility_clustering(frame_ids, all_images, points3D):
     clusters = []
     visited = set()
@@ -160,11 +105,74 @@ def get_covisibility_frames(frame_id, all_images, points3D, covisibility_frame=5
     return valid_db_ids
 
 
+def get_covisibility_frames_by_pose(frame_id, pred_qvec, pred_tvec, points3D, all_images, covisibility_frame=50, q_th=5,
+                                    obs_th=5,
+                                    t_th=10, ref_3Dpoints=None):
+    if ref_3Dpoints is not None:
+        observed = ref_3Dpoints
+        connected_frames = [j for i in ref_3Dpoints if i != -1 for j in points3D[i].image_ids]
+        connected_frames = np.unique(connected_frames)
+    else:
+        observed = all_images[frame_id].point3D_ids
+        connected_frames = [j for i in observed if i != -1 for j in points3D[i].image_ids]
+        connected_frames = np.unique(connected_frames)
+    print('Find {:d} connected frames'.format(len(connected_frames)))
+    db_ids = []
+    db_t_dists = []
+    db_q_dists = []
+
+    db_obs = {}
+    for db_id in connected_frames:
+        name = all_images[db_id].name
+        if name.find('left') >= 0 or name.find("right") >= 0:
+            continue
+
+        p3d_ids = all_images[db_id].point3D_ids
+        covisible_p3ds = [v for v in observed if v != -1 and len(points3D[v].image_ids) >= obs_th and v in p3d_ids]
+        db_obs[db_id] = len(covisible_p3ds)
+
+        db_qvec = all_images[db_id].qvec
+        db_tvec = all_images[db_id].tvec
+
+        q_error, t_error, _ = compute_pose_error(pred_qcw=pred_qvec, pred_tcw=pred_tvec, gt_qcw=db_qvec, gt_tcw=db_tvec)
+        if q_error > q_th:
+            continue
+        db_ids.append(db_id)
+        db_t_dists.append(t_error)
+        db_q_dists.append(q_error)
+
+    resort_ids = np.argsort(db_t_dists)
+    valid_db_ids = []
+    for did in resort_ids:
+        valid_db_ids.append(db_ids[did])
+        print('Ref frame {:d}, q_error:{:.3f}, t_error: {:.3f} from pose'.format(len(valid_db_ids), db_q_dists[did],
+                                                                                 db_t_dists[did]))
+        if covisibility_frame > 0:
+            if len(valid_db_ids) >= covisibility_frame:
+                break
+
+    if len(valid_db_ids) >= covisibility_frame:
+        print('Retain {:d} valid connected frames'.format(len(valid_db_ids)))
+        return valid_db_ids
+
+    sorted_db_obs = sort_dict_by_value(data=db_obs, reverse=True)
+    for item in sorted_db_obs:
+        if item[0] in valid_db_ids:
+            continue
+        valid_db_ids.append(item[0])
+
+        print('Ref frame {:d} from obs'.format(len(valid_db_ids)))
+        if covisibility_frame > 0:
+            if len(valid_db_ids) >= covisibility_frame:
+                break
+    print('Retain {:d} valid connected frames'.format(len(valid_db_ids)))
+    return valid_db_ids
+
+
 def pose_refinement_covisibility(qname, cfg, feature_file, db_frame_id, db_images, points3D, thresh, matcher,
                                  with_label=False,
                                  covisibility_frame=50,
                                  ref_3Dpoints=None,
-                                 plus05=False,
                                  iters=1,
                                  obs_th=3,
                                  opt_th=12,
@@ -175,13 +183,23 @@ def pose_refinement_covisibility(qname, cfg, feature_file, db_frame_id, db_image
                                  opt_type="ref",
                                  image_dir=None,
                                  vis_dir=None,
-                                 depth_th=0,
                                  gt_qvec=None,
                                  gt_tvec=None,
                                  ):
-    db_ids = get_covisibility_frames(frame_id=db_frame_id, all_images=db_images, points3D=points3D,
-                                     covisibility_frame=covisibility_frame, ref_3Dpoints=ref_3Dpoints,
-                                     obs_th=obs_th)
+    if opt_type.find('obs') >= 0:
+        db_ids = get_covisibility_frames(frame_id=db_frame_id, all_images=db_images, points3D=points3D,
+                                         covisibility_frame=covisibility_frame, ref_3Dpoints=ref_3Dpoints,
+                                         obs_th=obs_th)
+    elif opt_type.find('pos') >= 0:
+        db_ids = get_covisibility_frames_by_pose(frame_id=db_frame_id, all_images=db_images, points3D=points3D,
+                                                 covisibility_frame=covisibility_frame, ref_3Dpoints=ref_3Dpoints,
+                                                 pred_qvec=qvec, pred_tvec=tvec, q_th=10, t_th=10, obs_th=obs_th)
+    else:
+        print('ERROR: Please specify method for getting reference images {:s}'.format(opt_type))
+        exit(0)
+    # db_ids = get_covisibility_frames(frame_id=db_frame_id, all_images=db_images, points3D=points3D,
+    #                                  covisibility_frame=covisibility_frame, ref_3Dpoints=ref_3Dpoints,
+    #                                  obs_th=obs_th)
 
     kpq = feature_file[qname]['keypoints'].__array__()
     desc_q = feature_file[qname]['descriptors'].__array__()
@@ -352,26 +370,13 @@ def pose_refinement_covisibility(qname, cfg, feature_file, db_frame_id, db_image
             inlier_mask_opt = []
             for pi in range(proj_error.shape[0]):
                 if proj_error[pi] <= opt_th and inliers_rsac[pi]:
-                    # if proj_error[pi] <= opt_th:
                     keep = True
                 else:
                     keep = False
-                # if np.sum(inlier_mask) > 100:
-                #     if depth_th > 0:
-                #         if depth[pi] > depth_th or depth[pi] <= 0:
-                #             keep = False
-                #     elif depth_th == -1.0:
-                #         if depth[pi] > md_depth or depth[pi] <= 0:
-                #             keep = False
                 inlier_mask_opt.append(keep)
 
             ret = pycolmap.pose_refinement(tvec, qvec, mkpq, mp3d, inlier_mask_opt, cfg)
-            # mkpq = mkpq[inlier_mask_opt]
-            # mp3d = mp3d[inlier_mask_opt]
-            # all_3D_ids = np.array(all_3D_ids)[inlier_mask_opt]
-            # all_score_q = np.array(all_score_q)[inlier_mask_opt]
-            # ret = pycolmap.absolute_pose_estimation(mkpq, mp3d, cfg, opt_th)
-            #
+
             qvec = ret['qvec']
             tvec = ret['tvec']
 
@@ -382,9 +387,6 @@ def pose_refinement_covisibility(qname, cfg, feature_file, db_frame_id, db_image
             depth = calc_depth(points3D=mp3d, rvec=qvec, tvec=tvec, camera=cfg)
             # inlier_mask = np.array(inlier_mask_opt).reshape(-1,)
             inlier_mask = (proj_error <= opt_th)  # np.array(inlier_mask_opt).reshape(-1,)
-
-            # if depth_th > 0:
-            #     inlier_mask = inlier_mask * (depth <= depth_th) * (depth > 0)
 
             # print('heiheihei - inliers: ', proj_error[inlier_mask].shape)
             mn_error = np.min(proj_error[inlier_mask])
@@ -428,463 +430,6 @@ def pose_refinement_covisibility(qname, cfg, feature_file, db_frame_id, db_image
     ret['score_q'] = all_score_q
     ret['log_info'] = log_info
     return ret
-
-
-def pose_refinment_covisibility_by_projection(qname, cfg, feature_file, db_frame_id, db_images, points3D, thresh,
-                                              matcher,
-                                              qvec,
-                                              tvec,
-                                              q_p3d_ids,
-                                              radius=10,
-                                              n_can_3Ds=50,
-                                              with_label=False,
-                                              covisibility_frame=50,
-                                              ref_3Dpoints=None,
-                                              plus05=False,
-                                              iters=1,
-                                              log_info=None,
-                                              opt_type="ref",
-                                              obs_th=0,
-                                              opt_th=12,
-                                              image_dir=None,
-                                              with_dist=False,
-                                              ):
-    db_ids = get_covisibility_frames(frame_id=db_frame_id, all_images=db_images, points3D=points3D,
-                                     covisibility_frame=covisibility_frame, ref_3Dpoints=ref_3Dpoints, obs_th=obs_th)
-
-    kpq = feature_file[qname]['keypoints'].__array__()
-    desc_q = feature_file[qname]['descriptors'].__array__()
-    desc_q = desc_q.transpose()
-    if with_label:
-        label_q = feature_file[qname]['labels'].__array__()
-    else:
-        label_q = None
-
-    n_kpq = kpq.shape[0]
-    H = cfg['height']
-    W = cfg['width']
-    rs = [i for i in range(-radius, radius + 1)]
-    # print('rs: ', rs)
-    pos_kp_ids = {}
-    qid_3Did = {}
-    qid_score = {}
-    for i in range(n_kpq):
-        u = kpq[i, 0]
-        v = kpq[i, 1]
-        for dv in rs:
-            for du in rs:
-                nv = int(v + dv)
-                nu = int(u + du)
-                if nu < 0 or nu >= W or nv < 0 or nv >= H:
-                    continue
-                id = nv * W + nu
-
-                if id in pos_kp_ids.keys():
-                    pos_kp_ids[id].append(i)
-                else:
-                    pos_kp_ids[id] = [i]
-
-    if with_dist:
-        dist_thresh = calc_dist(qname=qname, db_images=db_images, points3D=points3D, qid_p3ds=q_p3d_ids,
-                                feature_file=feature_file, obs_th=obs_th)
-    else:
-        dist_thresh = 10
-    print("dist_th: ", dist_thresh)
-
-    for i, db_id in enumerate(db_ids):
-        points3D_ids = db_images[db_id].point3D_ids
-        db_name = db_images[db_id].name
-        if points3D_ids.size == 0:
-            print('No 3D points in db image: ', db_name)
-            continue
-
-        #### test reprojection
-        '''
-        mkdbi = feature_file[db_name]['keypoints'].__array__()
-        valid_mkdb = []
-        valid_mp3d = []
-        obs = []
-        for pid, p3d in enumerate(points3D_ids):
-            if p3d == -1:
-                continue
-
-            valid_mkdb.append(mkdbi[pid])
-            valid_mp3d.append(points3D[p3d].xyz)
-            obs.append(int(len(points3D[p3d].image_ids)))
-
-        obs = np.array(obs, np.int)
-        valid_mkdb = np.array(valid_mkdb, np.float).reshape(-1, 2)
-        valid_mp3d = np.array(valid_mp3d, np.float).reshape(-1, 3)
-        proj_valid_mkdb = reproject(points3D=valid_mp3d, rvec=qvec, tvec=tvec, camera=cfg)
-
-        q_img = cv2.imread(osp.join(image_dir, qname))
-        db_img = cv2.imread(osp.join(image_dir, db_name))
-        inliers = [True for k in range(proj_valid_mkdb.shape[0]) if len(points3D)]
-        inliers = np.array(inliers, np.uint8)
-        mask = (proj_valid_mkdb[:, 0] >= 0) * (proj_valid_mkdb[:, 0] < H) * (proj_valid_mkdb[:, 1] >= 0 ) * (proj_valid_mkdb[:, 1] <H) * (obs > 5)
-        valid_mkdb = valid_mkdb[mask]
-        proj_valid_mkdb = proj_valid_mkdb[mask]
-        inliers = inliers[mask]
-
-        img_match = plot_matches(img1=q_img, img2=db_img, pts1=proj_valid_mkdb, pts2=valid_mkdb, inliers=inliers)
-        img_match = resize_img(img_match, nh=512)
-        cv2.imshow("img_match_proj", img_match)
-        cv2.waitKey(0)
-        '''
-
-        desc_db = feature_file[db_name]["descriptors"].__array__()
-        desc_db = desc_db.transpose()
-        for db_kpi, id_3D in enumerate(points3D_ids):
-            if id_3D == -1:
-                continue
-
-            # if len(points3D[id_3D].image_ids) < obs_th:
-            #     continue
-
-            xyz = points3D[id_3D].xyz
-            proj_uv = reproject(xyz.reshape(1, 3), rvec=qvec, tvec=tvec, camera=cfg)
-            # print('proj_uv: ', proj_uv, proj_uv.shape)
-            pu = proj_uv[0, 0]
-            pv = proj_uv[0, 1]
-            if pu < 0 or pu >= W or pv < 0 or pv >= H:
-                continue
-
-            db_desc_i = desc_db[db_kpi]
-
-            puv = int(pv) * W + int(pu)
-            if puv not in pos_kp_ids.keys():
-                continue
-            cans = pos_kp_ids[puv]
-
-            best_score = -1
-            best_q_id = -1
-            for q_id in cans:
-                q_desc_i = desc_q[q_id]
-                score = q_desc_i @ db_desc_i.reshape(-1, 1)
-                dist = np.sqrt(2 - 2 * score + 1e-6)
-
-                # apply dist for rejection
-                if dist > dist_thresh:
-                    continue
-
-                if score > best_score:
-                    best_score = score
-                    best_q_id = q_id
-
-            if best_q_id == -1:
-                continue
-
-            if best_q_id not in qid_3Did.keys():
-                qid_3Did[best_q_id] = id_3D
-                qid_score[best_q_id] = best_score
-            else:
-                if best_score > qid_score[best_q_id]:
-                    qid_score[best_q_id] = best_score
-                    qid_3Did[best_q_id] = id_3D
-
-            # for c in cans:
-            #     if c not in qid_3Did.keys():
-            #         qid_3Did[c] = [id_3D]
-            #     else:
-            #         qid_3Did[c].append(id_3D)
-    mp3d = []
-    mkpq = []
-    all_3D_ids = []
-    discard_qid_id_3D = {}
-    matched_qid_3D = {}
-
-    for q_id in q_p3d_ids.keys():
-        q_id_3Ds = q_p3d_ids[q_id]
-        for id_3D in [q_id_3Ds]:
-            if len(points3D[id_3D].image_ids) < obs_th:
-                discard_qid_id_3D[q_id] = id_3D
-                continue
-
-            if q_id in matched_qid_3D.keys():
-                if id_3D in matched_qid_3D[q_id]:
-                    continue
-                else:
-                    matched_qid_3D[q_id].append(id_3D)
-            else:
-                matched_qid_3D[q_id] = [id_3D]
-
-            mp3d.append(points3D[id_3D].xyz)
-            mkpq.append(kpq[q_id])
-            all_3D_ids.append(id_3D)
-
-    for q_id in qid_3Did.keys():
-        q_id_3Ds = qid_3Did[q_id]
-        for id_3D in [q_id_3Ds]:
-            if len(points3D[id_3D].image_ids) < obs_th:
-                discard_qid_id_3D[q_id] = id_3D
-                continue
-
-            if q_id in matched_qid_3D.keys():
-                if id_3D in matched_qid_3D[q_id]:
-                    continue
-                else:
-                    matched_qid_3D[q_id].append(id_3D)
-            else:
-                matched_qid_3D[q_id] = [id_3D]
-
-            mp3d.append(points3D[id_3D].xyz)
-            mkpq.append(kpq[q_id])
-            all_3D_ids.append(id_3D)
-
-    # if len(mp3d) < 100:
-    #     for q_id in discard_qid_id_3D.keys():
-    #         id_3D = discard_qid_id_3D[q_id]
-    #
-    #         if len(points3D[id_3D].image_ids) < obs_th / 2:
-    #             discard_qid_id_3D[q_id] = id_3D
-    #             continue
-    #         if q_id in qid_3Did.keys():
-    #             if id_3D == qid_3Did[q_id]:
-    #                 continue
-    #         mp3d.append(points3D[id_3D].xyz)
-    #         mkpq.append(kpq[q_id])
-    #         all_3D_ids.append(id_3D)
-
-    if len(mp3d) < n_can_3Ds:
-        print('Find insufficient {:d} 3d points by reprojection'.format(len(mp3d)))
-        return {'success': False, 'num_inliers': 0, 'qvec': None, 'tvec': None}
-
-    print('Find {:d} matched 3D points by reprojection'.format(len(mp3d)))
-
-    mp3d = np.array(mp3d, np.float).reshape(-1, 3)
-    mkpq = np.array(mkpq, np.float).reshape(-1, 2)
-
-    if plus05:
-        mkpq = mkpq + 0.5
-
-    if opt_type.find("ras") >= 0:
-        # ret = pycolmap.absolute_pose_estimation(mkpq, mp3d, cfg, thresh)
-        ret = pycolmap.absolute_pose_estimation(mkpq, mp3d, cfg, opt_th)
-        # print(ret['inliers'])
-        inlier_mask_opt = ret['inliers']
-        qvec = ret['qvec']
-        tvec = ret['tvec']
-        proj_mkp = reproject(mp3d, rvec=qvec, tvec=tvec, camera=cfg)
-        proj_error = (mkpq - proj_mkp) ** 2
-        proj_error = np.sqrt(proj_error[:, 0] + proj_error[:, 1])
-        inlier_mask = np.array(inlier_mask_opt).reshape(-1, )
-        mn_error = np.min(proj_error[inlier_mask])
-        md_error = np.median(proj_error[inlier_mask])
-        mx_error = np.max(proj_error[inlier_mask])
-        print_text = 'Find {:d}/{:d} inliers after RANSAC with mn_error: {:.2f}, md_error: {:.2f} mx_error: {:.2f}'.format(
-            ret['num_inliers'],
-            np.sum(inlier_mask),
-            mn_error,
-            md_error,
-            mx_error)
-        print(print_text)
-        if log_info is not None:
-            log_info += (print_text + "\n")
-
-    # """
-    # inlier_mask = np.array([True for i in range(mkpq.shape[0])], np.uint8).reshape(-1, 1)
-    # inlier_mask = (mkpq[:, 0] >= 0)  # all matches are inliers
-    if opt_type.find("ref") >= 0:
-        for i in range(iters):
-            inlier_mask_opt = []
-            for pi in range(proj_error.shape[0]):
-                if proj_error[pi] <= opt_th:
-                    inlier_mask_opt.append(True)
-                else:
-                    inlier_mask_opt.append(False)
-
-            ret = pycolmap.pose_refinement(tvec, qvec, mkpq, mp3d, inlier_mask_opt, cfg)
-
-            proj_mkp = reproject(mp3d, rvec=qvec, tvec=tvec, camera=cfg)
-            proj_error = (mkpq - proj_mkp) ** 2
-            proj_error = np.sqrt(proj_error[:, 0] + proj_error[:, 1])
-            # inlier_mask = np.array(inlier_mask_opt).reshape(-1,)
-            inlier_mask = (proj_error <= opt_th)  # np.array(inlier_mask_opt).reshape(-1,)
-            # print('heiheihei - inliers: ', proj_error[inlier_mask].shape)
-            mn_error = np.min(proj_error[inlier_mask])
-            md_error = np.median(proj_error[inlier_mask])
-            mx_error = np.max(proj_error[inlier_mask])
-            print_text = 'After Iter: {:d} inliers: {:d}/{:d} mn_error: {:.2f}, md_error: {:.2f} mx_error: {:.2f}'.format(
-                i + 1,
-                np.sum(
-                    inlier_mask),
-                np.sum(inlier_mask_opt),
-                mn_error,
-                md_error,
-                mx_error)
-            print(print_text)
-            if log_info is not None:
-                log_info += (print_text + "\n")
-
-    ret['num_inliers'] = np.sum(inlier_mask)
-    ret['mkpq'] = mkpq
-    ret['3D_ids'] = all_3D_ids
-    ret['inliers'] = inlier_mask_opt
-    ret['db_ids'] = db_ids
-    # """
-    # for logging
-    inlier_3D_ids = []
-    for i in range(len(all_3D_ids)):
-        if inlier_mask[i]:
-            inlier_3D_ids.append(all_3D_ids[i])
-
-    for i, db_id in enumerate(db_ids):
-        points3D_ids = db_images[db_id].point3D_ids
-        db_name = db_images[db_id].name
-        if points3D_ids.size == 0:
-            print('No 3D points in db image: ', db_name)
-            continue
-
-        matched_3D_ids = [v for v in inlier_3D_ids if v in points3D_ids]
-        print_text = "Find {:d} inliers with {:s}".format(len(matched_3D_ids), db_name)
-        print(print_text)
-        if log_info is not None:
-            log_info += (print_text + "\n")
-
-    print_text = "Find {:d}/{:d} unique 3D points".format(len(inlier_3D_ids), len(
-        [v for v in inlier_3D_ids if inlier_3D_ids.count(v) == 1]))
-    print(print_text)
-    if log_info is not None:
-        log_info += (print_text + "\n")
-    return {**ret, **{'log_info': log_info}}
-
-
-def pose_from_cluster(qname, qinfo, db_ids, db_images, points3D,
-                      feature_file, match_file, thresh):
-    kpq = feature_file[qname]['keypoints'].__array__()
-    kp_idx_to_3D = defaultdict(list)
-    kp_idx_to_3D_to_db = defaultdict(lambda: defaultdict(list))
-    num_matches = 0
-
-    for i, db_id in enumerate(db_ids):
-        db_name = db_images[db_id].name
-        points3D_ids = db_images[db_id].point3D_ids
-
-        pair = names_to_pair(qname, db_name)
-        matches = match_file[pair]['matches0'].__array__()
-        valid = np.where(matches > -1)[0]
-        # print ("valid: ", valid)
-        # print ("matches: ", matches)
-        # print ("qname: ", qname, db_name)
-        # exit(0)
-        if points3D_ids.size == 0:
-            continue  # handles case where image does not see 3D points
-        valid = valid[points3D_ids[matches[valid]] != -1]
-        num_matches += len(valid)
-
-        for idx in valid:
-            id_3D = points3D_ids[matches[idx]]
-            kp_idx_to_3D_to_db[idx][id_3D].append(i)
-            # avoid duplicate observations
-            if id_3D not in kp_idx_to_3D[idx]:
-                kp_idx_to_3D[idx].append(id_3D)
-
-    idxs = list(kp_idx_to_3D.keys())
-    mkp_idxs = [i for i in idxs for _ in kp_idx_to_3D[i]]
-    mkpq = kpq[mkp_idxs]
-    mkpq += 0.5  # COLMAP coordinates
-
-    mp3d_ids = [j for i in idxs for j in kp_idx_to_3D[i]]
-    mp3d = [points3D[j].xyz for j in mp3d_ids]
-    mp3d = np.array(mp3d).reshape(-1, 3)
-
-    # mostly for logging and post-processing
-    mkp_to_3D_to_db = [(j, kp_idx_to_3D_to_db[i][j])
-                       for i in idxs for j in kp_idx_to_3D[i]]
-
-    camera_model, width, height, params = qinfo
-    cfg = {
-        'model': camera_model,
-        'width': width,
-        'height': height,
-        'params': params,
-    }
-    ret = pycolmap.absolute_pose_estimation(mkpq, mp3d, cfg, thresh)
-    ret['cfg'] = cfg
-    return ret, mkpq, mp3d, mp3d_ids, num_matches, (mkp_idxs, mkp_to_3D_to_db)
-
-
-def pose_from_single(qname, qinfo, db_ids, db_images, points3D,
-                     feature_file, match_file, thresh, image_dir):
-    print("qname: ", qname)
-    q_img = cv2.imread(osp.join(image_dir, qname))
-    kpq = feature_file[qname]['keypoints'].__array__()
-
-    camera_model, width, height, params = qinfo
-    cfg = {
-        'model': camera_model,
-        'width': width,
-        'height': height,
-        'params': params,
-    }
-
-    for i, db_id in enumerate(db_ids):
-        db_name = db_images[db_id].name
-        print("db_name: ", db_name)
-
-        db_img = cv2.imread(osp.join(image_dir, db_name))
-
-        kpdb = feature_file[db_name]['keypoints'].__array__()
-
-        points3D_ids = db_images[db_id].point3D_ids
-
-        pair = names_to_pair(qname, db_name)
-        matches = match_file[pair]['matches0'].__array__()
-        valid = np.where(matches > -1)[0]
-
-        if points3D_ids.size == 0:
-            print("No 3D points in this db image: ", db_name)
-            continue
-
-        valid = valid[points3D_ids[matches[valid]] != -1]
-
-        mp3d = []
-        mkpq = []
-        mkpdb = []
-        for idx in valid:
-            id_3D = points3D_ids[matches[idx]]
-            mp3d.append(points3D[id_3D].xyz)
-
-            mkpq.append(kpq[idx])
-            mkpdb.append(kpdb[matches[idx]])
-
-            # p3d_idxes.append(points3D_ids[matches[idx]])
-
-        mp3d = np.array(mp3d, np.float).reshape(-1, 3)
-        mkpq = np.array(mkpq, np.float).reshape(-1, 2) + 0.5
-
-        if mp3d.shape[0] < 10:
-            print("qnqme: {:s} dbname: {:s} failed because of insufficient matches {:d}".format(qname, db_name,
-                                                                                                mp3d.shape[0]))
-            continue
-
-        ret = pycolmap.absolute_pose_estimation(mkpq, mp3d, cfg, thresh)
-
-        if not ret['success'] and ret['num_inliers'] >= 30:
-            print("qname: {:s} dbname: {:s} failed after optimization".format(qname, db_name))
-            continue
-
-        # localization succeed
-        qvec = ret['qvec']
-        tvec = ret['tvec']
-        ret['cfg'] = cfg
-        inliers = ret['inliers']
-        num_inliers = ret['num_inliers']
-        matches = np.array(ret['inliers'], np.bool).reshape(-1, 1)
-
-        img_match = plot_matches(img1=q_img, img2=db_img,
-                                 pts1=mkpq, pts2=mkpdb,
-                                 inliers=matches)
-
-        cv2.namedWindow("match", cv2.WINDOW_NORMAL)
-        cv2.imshow("match", img_match)
-        cv2.waitKey(5)
-
-        return qvec, tvec, inliers, num_inliers
-
-    # print("Try to localization {:s} failed".format(qname))
-    closest = db_images[db_ids[0]]
-    return closest.qvec, closest.tvec, [], 0
 
 
 def feature_matching(desc_q, desc_db, matcher, label_q=None, label_db=None, db_3D_ids=None):
@@ -939,8 +484,7 @@ def feature_matching(desc_q, desc_db, matcher, label_q=None, label_db=None, db_3
     return matches
 
 
-def match_cluster_2D(kpq, desc_q, label_q, db_ids, points3D, feature_file, db_images, with_label, matcher,
-                     plus05=False, obs_th=0):
+def match_cluster_2D(kpq, desc_q, label_q, db_ids, points3D, feature_file, db_images, with_label, matcher, obs_th=0):
     all_mp3d = []
     all_mkpq = []
     all_mp3d_ids = []
@@ -1044,16 +588,12 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
                                    q_seg=None,
                                    log_info=None,
                                    opt_type="cluster",
-                                   plus05=False,
-                                   do_cluster_check=False,
                                    iters=1,
                                    radius=0,
                                    obs_th=0,
                                    opt_th=12,
-                                   with_dist=False,
                                    inlier_ths=None,
                                    retrieval_sources=None,
-                                   depth_th=0,
                                    gt_qvec=None,
                                    gt_tvec=None,
                                    ):
@@ -1061,7 +601,7 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
     db_name_to_id = {image.name: i for i, image in db_images.items()}
     q_img = cv2.imread(osp.join(image_dir, qname))
     kpq = feature_file[qname]['keypoints'].__array__()
-    scoreq = feature_file[qname]['scores'].__array__()
+    score_q = feature_file[qname]['scores'].__array__()
     desc_q = feature_file[qname]['descriptors'].__array__()
     desc_q = desc_q.transpose()
 
@@ -1110,7 +650,6 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
                                                                      db_images=db_images,
                                                                      with_label=with_label,
                                                                      matcher=matcher,
-                                                                     plus05=plus05,
                                                                      obs_th=3,
                                                                      )
 
@@ -1119,10 +658,8 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
                 qname,
                 db_name,
                 cluster_idx + 1,
-                len(
-                    db_ids),
-                mp3d.shape[
-                    0])
+                len(db_ids),
+                mp3d.shape[0])
             print(print_text)
             if log_info is not None:
                 log_info += (print_text + '\n')
@@ -1359,14 +896,7 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
                 cv2.imwrite(osp.join(vis_dir.as_posix(),
                                      (qname.replace('/', '-') + '_' + id_str + '_' + best_dbname.replace('/', '-'))),
                             img_match)
-        keep = False
-        # if best_inliers >= 10:
-        #     if ret['num_inliers'] > best_results['num_inliers']:
-        #         keep = True
-        #     else:
-        #         if best_results['single_num_inliers'] < 10:
-        #             keep = True
-        # else:
+
         if best_inliers < 8:  # at least 8 inliers from a single image
             keep = False
         elif ret['num_inliers'] <= best_results['num_inliers']:
@@ -1409,17 +939,6 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
             best_results['order'] = cluster_idx + 1
             best_results['ret_source'] = ret_source
 
-        if do_cluster_check:
-            cluster = is_cluster(H=cfg['height'], W=cfg['width'], points2D=matched_points2D, radius=50, ratio=0.6)
-            if cluster:
-                print_text = "qname: {:s} dbname: {:s} ({:d}/{:d}) failed because of cluster".format(qname,
-                                                                                                     db_name,
-                                                                                                     cluster_idx + 1,
-                                                                                                     len(db_ids))
-                print(print_text)
-                if log_info is not None:
-                    log_info += (print_text + '\n')
-
         print_text = "qname: {:s} dbname: {:s} ({:s} {:d}/{:d}) initialization succeed with {:d}/{:d} inliers".format(
             qname,
             best_dbname,
@@ -1434,34 +953,7 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
             log_info += (print_text + '\n')
 
         if do_covisility_opt:
-            if opt_type.find("proj") >= 0:
-                q_p3d_ids = {}
-                for i in range(len(ret['inliers'])):
-                    if ret['inliers'][i]:
-                        q_p3d_ids[q_ids[i]] = mp3d_ids[i]
-                ret = pose_refinment_covisibility_by_projection(qname=qname, cfg=cfg, feature_file=feature_file,
-                                                                db_frame_id=db_name_to_id[best_dbname],
-                                                                db_images=db_images, points3D=points3D,
-                                                                thresh=thresh, with_label=with_label,
-                                                                covisibility_frame=covisibility_frame,
-                                                                matcher=matcher,
-                                                                # ref_3Dpoints=inlier_p3d_ids,
-                                                                ref_3Dpoints=None,
-                                                                q_p3d_ids=q_p3d_ids,
-                                                                radius=radius,
-                                                                qvec=ret['qvec'],
-                                                                tvec=ret['tvec'],
-                                                                n_can_3Ds=30,
-                                                                plus05=plus05,
-                                                                iters=iters,
-                                                                opt_type=opt_type,
-                                                                opt_th=opt_th,
-                                                                obs_th=obs_th,
-                                                                image_dir=image_dir,
-                                                                with_dist=with_dist,
-                                                                log_info='',
-                                                                )
-            elif opt_type.find('clu') >= 0:
+            if opt_type.find('clu') >= 0:
                 ret = pose_refinement_covisibility(qname=qname,
                                                    cfg=cfg,
                                                    feature_file=feature_file,
@@ -1472,7 +964,6 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
                                                    matcher=matcher,
                                                    # ref_3Dpoints=inlier_p3d_ids,
                                                    ref_3Dpoints=None,
-                                                   plus05=plus05,
                                                    iters=iters,
                                                    obs_th=obs_th,
                                                    opt_th=opt_th,
@@ -1483,7 +974,6 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
                                                    opt_type=opt_type,
                                                    image_dir=image_dir,
                                                    vis_dir=vis_dir,
-                                                   depth_th=depth_th,
                                                    gt_qvec=gt_qvec,
                                                    gt_tvec=gt_tvec,
                                                    )
@@ -1610,15 +1100,6 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
         ret['cfg'] = cfg
         num_inliers = ret['num_inliers']
 
-        # del cluster_info
-        # del dbname_matches
-        # del ret
-        # del matched_mkpq
-        # del matched_p3d
-        # del matched_mkdb
-        # del matched_points2D
-        # del matched_points3D
-
         return qvec, tvec, num_inliers, {**best_results, **{'log_info': log_info}}
 
     if best_results['num_inliers'] >= 10:  # 20 for aachen
@@ -1629,34 +1110,7 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
         inliers = best_results['inliers']
 
         if do_covisility_opt:
-            if opt_type.find("proj") >= 0:
-                q_p3d_ids = {}
-                for i in range(len(inliers)):
-                    if inliers[i]:
-                        q_p3d_ids[q_ids[i]] = mp3d_ids[i]
-                ret = pose_refinment_covisibility_by_projection(qname=qname, cfg=cfg, feature_file=feature_file,
-                                                                db_frame_id=db_name_to_id[best_dbname],
-                                                                db_images=db_images, points3D=points3D,
-                                                                thresh=thresh, with_label=with_label,
-                                                                covisibility_frame=covisibility_frame,
-                                                                matcher=matcher,
-                                                                # ref_3Dpoints=inlier_p3d_ids,
-                                                                ref_3Dpoints=None,
-                                                                q_p3d_ids=q_p3d_ids,
-                                                                radius=radius,
-                                                                qvec=qvec,
-                                                                tvec=tvec,
-                                                                n_can_3Ds=30,
-                                                                plus05=plus05,
-                                                                iters=iters,
-                                                                opt_type=opt_type,
-                                                                opt_th=opt_th,
-                                                                obs_th=obs_th,
-                                                                image_dir=image_dir,
-                                                                with_dist=with_dist,
-                                                                log_info='',
-                                                                )
-            elif opt_type.find('clu') >= 0:
+            if opt_type.find('clu') >= 0:
                 ret = pose_refinement_covisibility(qname=qname,
                                                    cfg=cfg,
                                                    feature_file=feature_file,
@@ -1667,7 +1121,6 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
                                                    matcher=matcher,
                                                    # ref_3Dpoints=inlier_p3d_ids,
                                                    ref_3Dpoints=None,
-                                                   plus05=plus05,
                                                    iters=iters,
                                                    obs_th=obs_th,
                                                    opt_th=opt_th,
@@ -1770,10 +1223,8 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
                     if vis_dir is not None:
                         id_str = '{:03d}'.format(idx + 1)
                         cv2.imwrite(osp.join(vis_dir.as_posix(),
-                                             (qname.replace('/',
-                                                            '-') + '_' + opt_type + id_str + '_' + dbname.replace(
-                                                 '/',
-                                                 '-'))),
+                                             (qname.replace('/', '-') + '_' + opt_type + id_str + '_' + dbname.replace(
+                                                 '/', '-'))),
                                     img_match)
 
         # localization succeed
@@ -1782,23 +1233,8 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
         ret['cfg'] = cfg
         num_inliers = ret['num_inliers']
 
-        # del cluster_info
-        # del dbname_matches
-        # del ret
-        # del matched_mkpq
-        # del matched_p3d
-        # del matched_mkdb
-        # del matched_points2D
-        # del matched_points3D
-
         # return qvec, tvec, num_inliers, {**best_results, **{'log_info': log_info}}
         return qvec, tvec, 0, {**best_results, **{'log_info': log_info}}
-
-        # print_text = 'Localize {:s} failed, but use the estimation from {:s}'.format(qname, best_results['dbname'])
-        # print(print_text)
-        # if log_info is not None:
-        #     log_info += (print_text + '\n')
-        # return qvec, tvec, num_inliers, {**best_results, **{'log_info': log_info}}
 
     db_largest_score = -1
     db_largest_score_cluster_id = None
@@ -1823,1183 +1259,6 @@ def pose_from_cluster_with_matcher(qname, qinfo, db_ids, db_images, points3D,
     if log_info is not None:
         log_info += (print_text + '\n')
     return closest.qvec, closest.tvec, -1, {**best_results, **{'log_info': log_info}}
-
-
-def pose_from_matcher_hloc(qname, qinfo, db_ids, db_images, points3D,
-                           feature_file,
-                           thresh,
-                           image_dir,
-                           matcher,
-                           do_covisility_opt=False,
-                           with_label=False,
-                           vis_dir=None,
-                           inlier_th=10,
-                           covisibility_frame=50,
-                           global_score=None,
-                           seg_dir=None,
-                           q_seg=None,
-                           log_info=None,
-                           opt_type="cluster",
-                           plus05=False,
-                           do_cluster_check=False,
-                           iters=1,
-                           radius=12, ):
-    def do_covisibility_clustering(frame_ids, all_images, points3D):
-        clusters = []
-        visited = set()
-        for frame_id in frame_ids:
-            # Check if already labeled
-            if frame_id in visited:
-                continue
-            # New component
-            clusters.append([])
-            queue = {frame_id}
-            while len(queue):
-                exploration_frame = queue.pop()
-                # Already part of the component
-                if exploration_frame in visited:
-                    continue
-                visited.add(exploration_frame)
-                clusters[-1].append(exploration_frame)
-
-                observed = all_images[exploration_frame].point3D_ids
-                connected_frames = set(
-                    j for i in observed if i != -1 for j in points3D[i].image_ids)
-                connected_frames &= set(frame_ids)
-                connected_frames -= visited
-                queue |= connected_frames
-
-        clusters = sorted(clusters, key=len, reverse=True)
-        return clusters
-
-    print("qname: ", qname)
-    db_name_to_id = {image.name: i for i, image in db_images.items()}
-    kpq = feature_file[qname]['keypoints'].__array__()
-    desc_q = feature_file[qname]['descriptors'].__array__()
-    desc_q = desc_q.transpose()
-
-    if with_label:
-        label_q = feature_file[qname]['labels'].__array__()
-    else:
-        label_q = None
-
-    # results = {}
-    camera_model, width, height, params = qinfo
-    cfg = {
-        'model': camera_model,
-        'width': width,
-        'height': height,
-        'params': params,
-    }
-
-    best_results = {
-        'tvec': None,
-        'rvec': None,
-        'num_inliers': 0,
-        'db_id': -1,
-        'order': -1,
-        'qname': qname,
-        'dbname': db_images[db_ids[0]].name,
-    }
-
-    if do_covisility_opt:
-        clusters = do_covisibility_clustering(frame_ids=db_ids, all_images=db_images, points3D=points3D)
-        print("Find {:d} clusters".format(len(clusters)))
-        best_inliers = 0
-        best_cluster = None
-        best_qvec = None
-        best_tvec = None
-
-        for i, cluster_ids in enumerate(clusters):
-            cluster_info, mp3d, mkpq, mp3d_ids, q_ids = match_cluster_2D(kpq=kpq, desc_q=desc_q, label_q=label_q,
-                                                                         db_ids=cluster_ids,
-                                                                         points3D=points3D,
-                                                                         feature_file=feature_file,
-                                                                         db_images=db_images,
-                                                                         with_label=with_label,
-                                                                         matcher=matcher,
-                                                                         plus05=True,
-                                                                         )
-            ret = pycolmap.absolute_pose_estimation(mkpq, mp3d, cfg, thresh)
-            if not ret['success']:
-                print('Localization failed with cluster {:d}/{:d}'.format(i + 1, len(clusters)))
-            else:
-                print('Find {:d} inliers from cluster {:d}/{:d} of {:d} frames'.format(ret['num_inliers'], i + 1,
-                                                                                       len(clusters),
-                                                                                       len(cluster_info.keys())))
-
-            if ret['success'] and ret['num_inliers'] > best_inliers:
-                best_cluster = i
-                best_inliers = ret['num_inliers']
-                best_qvec = ret['qvec']
-                best_tvec = ret['tvec']
-
-        if best_cluster is not None:
-            print('Find best cluster {:d} with {:d} inliers'.format(best_cluster + 1, best_inliers))
-            return best_qvec, best_tvec, best_inliers, best_results
-    else:
-        cluster_info, mp3d, mkpq, mp3d_ids, q_ids = match_cluster_2D(kpq=kpq, desc_q=desc_q, label_q=label_q,
-                                                                     db_ids=db_ids,
-                                                                     points3D=points3D,
-                                                                     feature_file=feature_file,
-                                                                     db_images=db_images,
-                                                                     with_label=with_label,
-                                                                     matcher=matcher,
-                                                                     plus05=True,
-                                                                     )
-        ret = pycolmap.absolute_pose_estimation(mkpq, mp3d, cfg, thresh)
-
-        if ret['success']:
-            return ret['qvec'], ret['tvec'], ret['num_inliers'], best_results
-
-    closest = db_images[db_ids[0]]
-    return closest.qvec, closest.tvec, 0, best_results
-
-
-def pose_from_cluster_with_matcher_hloc(qname, qinfo, db_ids, db_images, points3D,
-                                        cameras,
-                                        feature_file,
-                                        thresh,
-                                        image_dir,
-                                        matcher,
-                                        do_covisility_opt=False,
-                                        with_label=False,
-                                        vis_dir=None,
-                                        inlier_th=10,
-                                        covisibility_frame=50,
-                                        global_score=None,
-                                        seg_dir=None,
-                                        q_seg=None,
-                                        log_info=None,
-                                        opt_type="cluster",
-                                        plus05=False,
-                                        do_cluster_check=False,
-                                        iters=1,
-                                        radius=12,
-                                        obs_th=0,
-                                        opt_th=12,
-                                        with_dist=False,
-                                        ):
-    print("qname: ", qname)
-    db_name_to_id = {image.name: i for i, image in db_images.items()}
-    kpq = feature_file[qname]['keypoints'].__array__()
-    desc_q = feature_file[qname]['descriptors'].__array__()
-    # score_q = feature_file[qname]['score'].__array__()
-    desc_q = desc_q.transpose()
-
-    if with_label:
-        label_q = feature_file[qname]['labels'].__array__()
-    else:
-        label_q = None
-
-    # results = {}
-    camera_model, width, height, params = qinfo
-    cfg = {
-        'model': camera_model,
-        'width': width,
-        'height': height,
-        'params': params,
-    }
-
-    best_results = {
-        'tvec': None,
-        'rvec': None,
-        'num_inliers': 0,
-        'db_id': -1,
-        'order': -1,
-        'qname': qname,
-        'dbname': db_images[db_ids[0][0]].name,
-    }
-
-    for cluster_idx, db_id_cls in enumerate(db_ids):
-        db_id = db_id_cls[0]
-        db_name = db_images[db_id].name
-        cluster_info, mp3d, mkpq, mp3d_ids, q_ids = match_cluster_2D(kpq=kpq, desc_q=desc_q, label_q=label_q,
-                                                                     db_ids=db_id_cls,
-                                                                     points3D=points3D,
-                                                                     feature_file=feature_file,
-                                                                     db_images=db_images,
-                                                                     with_label=with_label,
-                                                                     matcher=matcher,
-                                                                     plus05=plus05,
-                                                                     # obs_th=obs_th,
-                                                                     obs_th=3,
-                                                                     )
-        if mp3d.shape[0] < inlier_th:
-            print_text = "qname: {:s} dbname: {:s}({:d}/{:d}) failed because of insufficient 3d points {:d}".format(
-                qname,
-                db_name,
-                cluster_idx + 1,
-                len(
-                    db_ids),
-                mp3d.shape[
-                    0])
-            print(print_text)
-            if log_info is not None:
-                log_info += (print_text + '\n')
-            continue
-
-        ret = pycolmap.absolute_pose_estimation(mkpq, mp3d, cfg, thresh)
-        # print('ret after initialization: ', ret)
-        # exit(0)
-
-        if not ret["success"]:
-            # results.append((qname, db_name, 0))
-            print_text = "qname: {:s} dbname: {:s} ({:d}/{:d}) failed after initialization".format(qname, db_name,
-                                                                                                   cluster_idx + 1,
-                                                                                                   len(db_ids))
-            print(print_text)
-            if log_info is not None:
-                log_info += (print_text + '\n')
-            continue
-
-        # with open('pairs-netvlad50-inliers-500-1015.txt', 'a+') as f:
-        #     if not ret['success']:
-        #         text = "{:s} {:s} with {:d} inliers".format(qname, db_name, 0)
-        #     else:
-        #         text = "{:s} {:s} with {:d} inliers".format(qname, db_name, ret['num_inliers'])
-        #     f.write(text + '\n')
-        #
-        #     print(text)
-        #
-        # if cluster_idx == len(db_ids) - 1:
-        #     return ret['qvec'], ret['tvec'], ret['num_inliers'], best_results
-        # else:
-        #     continue
-
-        inliers = ret['inliers']
-        inlier_p3d_ids = [mp3d_ids[i] for i in range(len(inliers)) if inliers[i]]
-
-        # visualize the matches
-        q_p3d_ids = np.zeros(shape=(desc_q.shape[0], 1), dtype=np.int) - 1
-        for idx, qid in enumerate(q_ids):
-            if inliers[idx]:
-                q_p3d_ids[qid] = mp3d_ids[idx]
-
-        best_dbname = None
-        best_inliers = -1
-        for db_name in cluster_info.keys():
-            matched_mp3d_ids = cluster_info[db_name]['mp_3d_ids']
-            matched_qids = cluster_info[db_name]['qids']
-            n = 0
-            for idx, qid in enumerate(matched_qids):
-                if matched_mp3d_ids[idx] == q_p3d_ids[qid]:
-                    n += 1
-            if n > best_inliers:
-                best_inliers = n
-                best_dbname = db_name
-
-        if best_dbname is not None:
-            # print('best_dbname: ', best_dbname)
-            # '''
-            vis_matches = cluster_info[best_dbname]['matches']
-            vis_p3d_ids = cluster_info[best_dbname]['mp_3d_ids']
-            vis_mkpdb = cluster_info[best_dbname]['mkpdb']
-            vis_mkpq = cluster_info[best_dbname]['mkpq']
-            vis_mp3d = cluster_info[best_dbname]['mp3d']
-            vis_qids = cluster_info[best_dbname]['qids']
-            vis_inliers = []  # np.zeros(shape=(vis_matches.shape[0], 1), dtype=np.int) - 1
-            for idx, vid in enumerate(vis_qids):
-                if vis_p3d_ids[idx] == q_p3d_ids[vid]:
-                    vis_inliers.append(True)
-                else:
-                    vis_inliers.append(False)
-            vis_inliers = np.array(vis_inliers, np.bool).reshape(-1, 1)
-            matched_points2D = [vis_mkpq[i] for i in range(len(vis_inliers)) if vis_inliers[i]]
-            matched_points3D = [vis_mp3d[i] for i in range(len(vis_inliers)) if vis_inliers[i]]
-            matched_points2D = np.vstack(matched_points2D)
-            matched_points3D = np.vstack(matched_points3D)
-            show_proj = False
-            if show_proj:
-                reproj_points2D = reproject(points3D=matched_points3D, rvec=ret['qvec'], tvec=ret['tvec'],
-                                            camera=cfg)
-
-                proj_error = (matched_points2D - reproj_points2D) ** 2
-                proj_error = np.sqrt(proj_error[:, 0] + proj_error[:, 1])
-                min_proj_error = np.min(proj_error)
-                max_proj_error = np.max(proj_error)
-                med_proj_error = np.median(proj_error)
-                # print('proj_error: ',  np.max(proj_error))
-
-                img_proj = plot_reprojpoint2D(img=q_img, points2D=matched_points2D, reproj_points2D=reproj_points2D)
-                img_proj = cv2.resize(img_proj, None, fx=0.5, fy=0.5)
-                img_proj = cv2.putText(img_proj, 'green p2D/red-proj', (20, 30),
-                                       cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                       (0, 255, 0), 2)
-                img_proj = cv2.putText(img_proj,
-                                       'mn/md/mx:{:.1f}/{:.1f}/{:.1f}'.format(min_proj_error, med_proj_error,
-                                                                              max_proj_error),
-                                       (20, 60),
-                                       cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                       (0, 0, 255), 2)
-
-            if global_score is not None:
-                if best_dbname in global_score.keys():
-                    gscore = global_score[best_dbname]
-                else:
-                    gscore = 0
-            else:
-                gscore = 0
-
-            text = qname + '_' + best_dbname
-
-            q_img = cv2.imread(osp.join(image_dir, qname))
-            db_img = cv2.imread(osp.join(image_dir, best_dbname))
-            # db_img = None
-            if with_label:
-                if seg_dir is not None:
-                    db_seg = cv2.imread(osp.join(seg_dir, best_dbname.replace("jpg", "png")))
-                else:
-                    db_seg = None
-            else:
-                db_seg = None
-            img_match = plot_matches(img1=q_img, img2=db_img,
-                                     pts1=vis_mkpq, pts2=vis_mkpdb,
-                                     inliers=vis_inliers, plot_outlier=False)
-            img_match = cv2.putText(img_match, 'm/i/r/o:{:d}/{:d}/{:.2f}/{:d}/{:.4f}'.format(
-                vis_matches.shape[0], best_inliers, best_inliers / vis_matches.shape[0], cluster_idx + 1, gscore),
-                                    (30, 30),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                    (0, 0, 255), 2)
-
-            vis_obs = [len(points3D[v].image_ids) for v in vis_p3d_ids]
-            mn_obs = np.min(vis_obs)
-            md_obs = np.median(vis_obs)
-            mx_obs = np.max(vis_obs)
-            img_match = cv2.putText(img_match,
-                                    'obs: mn/md/mx:{:d}/{:d}/{:d}'.format(int(mn_obs), int(md_obs),
-                                                                          int(mx_obs)),
-                                    (30, 60),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                    (0, 0, 255), 2)
-
-            img_match = cv2.resize(img_match, None, fx=0.5, fy=0.5)
-            if q_seg is not None and db_seg is not None:
-                q_seg = cv2.resize(q_seg, dsize=(q_img.shape[1], q_img.shape[0]), interpolation=cv2.INTER_NEAREST)
-                db_seg = cv2.resize(db_seg, dsize=(db_img.shape[1], db_img.shape[0]), interpolation=cv2.INTER_NEAREST)
-                seg_match = plot_matches(img1=q_seg, img2=db_seg,
-                                         pts1=vis_mkpq, pts2=vis_mkpdb,
-                                         inliers=vis_inliers)
-                seg_match = cv2.resize(seg_match, None, fx=0.5, fy=0.5)
-                img_match = np.hstack([img_match, seg_match])
-
-            if show_proj:
-                img_proj = resize_img(img_proj, nh=img_match.shape[0])
-                img_match = np.hstack([img_match, img_proj])
-            # print('img_match: ', img_match.shape, img_proj.shape)
-            cv2.imshow("match", img_match)
-            key = cv2.waitKey(5)
-            if vis_dir is not None:
-                id_str = '{:03d}'.format(cluster_idx + 1)
-                cv2.imwrite(osp.join(vis_dir.as_posix(),
-                                     (qname.replace('/', '-') + '_' + id_str + '_' + best_dbname.replace('/', '-'))),
-                            img_match)
-            # '''
-
-            print_text = 'Localize {:s} succeed with best reference {:s}/{:d}'.format(qname, best_dbname, best_inliers)
-            print(print_text)
-            if log_info is not None:
-                log_info += (print_text + '\n')
-
-            if ret['num_inliers'] > best_results['num_inliers']:
-                best_results['qvec'] = ret['qvec']
-                best_results['tvec'] = ret['qvec']
-                best_results['num_inliers'] = ret['num_inliers']
-                best_results['dbname'] = best_dbname
-                best_results['order'] = cluster_idx + 1
-
-        # calc_uncertainty(mkp=matched_points2D, mp3d=matched_points3D, qvec=ret['qvec'], tvec=ret['tvec'],
-        #                  camera=cfg,
-        #                  # r_samples=[-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
-        #                  r_samples=[0],
-        #                  # t_samples=[-1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1.0],
-        #                  t_samples=np.arange(-1., 1., 0.1),
-        #                  )
-        # exit(0)
-
-        if ret['num_inliers'] >= inlier_th:
-            show_refinement = False
-            # if do_covisility_opt and inlier_th < 100:
-            if do_covisility_opt:
-                show_refinement = True
-                q_p3d_ids = {}
-                for i in range(len(ret['inliers'])):
-                    if ret['inliers'][i]:
-                        q_p3d_ids[q_ids[i]] = mp3d_ids[i]
-                if opt_type.find('proj') >= 0:
-                    ret = pose_refinment_covisibility_by_projection(qname=qname, cfg=cfg, feature_file=feature_file,
-                                                                    db_frame_id=db_name_to_id[best_dbname],
-                                                                    db_images=db_images, points3D=points3D,
-                                                                    thresh=thresh, with_label=with_label,
-                                                                    covisibility_frame=covisibility_frame,
-                                                                    matcher=matcher,
-                                                                    # ref_3Dpoints=inlier_p3d_ids,
-                                                                    ref_3Dpoints=None,
-                                                                    q_p3d_ids=q_p3d_ids,
-                                                                    radius=radius,
-                                                                    qvec=ret['qvec'],
-                                                                    tvec=ret['tvec'],
-                                                                    n_can_3Ds=30,
-                                                                    plus05=plus05,
-                                                                    iters=iters,
-                                                                    log_info='',
-                                                                    opt_type=opt_type,
-                                                                    obs_th=obs_th,
-                                                                    opt_th=opt_th,
-                                                                    image_dir=image_dir,
-                                                                    with_dist=with_dist,
-                                                                    )
-                # elif opt_type == 'cluster':
-                else:
-                    ret = pose_refinement_covisibility(qname=qname,
-                                                       cfg=cfg,
-                                                       feature_file=feature_file,
-                                                       db_frame_id=db_name_to_id[best_dbname],
-                                                       db_images=db_images, points3D=points3D,
-                                                       thresh=thresh, with_label=with_label,
-                                                       covisibility_frame=covisibility_frame,
-                                                       matcher=matcher,
-                                                       # ref_3Dpoints=inlier_p3d_ids,
-                                                       ref_3Dpoints=None,
-                                                       plus05=plus05,
-                                                       iters=iters,
-                                                       obs_th=obs_th,
-                                                       opt_th=opt_th,
-                                                       radius=radius,
-                                                       qvec=ret['qvec'],
-                                                       tvec=ret['tvec'],
-                                                       log_info=log_info,
-                                                       image_dir=image_dir,
-                                                       vis_dir=vis_dir,
-                                                       )
-
-                log_info = log_info + ret['log_info']
-                print_text = 'Find {:d} inliers after optimization'.format(ret['num_inliers'])
-                print(print_text)
-                if log_info is not None:
-                    log_info += (print_text + "\n")
-
-                if not ret['success']:
-                    continue
-
-            # show_refinment = True
-            if show_refinement:
-                all_ref_db_ids = ret['db_ids']
-                all_mkpq = ret['mkpq']
-                all_score_q = ret['score_q']
-                all_3D_ids = ret['3D_ids']
-                inlier_mask = ret['inliers']
-                q_img = cv2.imread(osp.join(image_dir, qname))
-
-                dbname_ninliers = {}
-                dbname_matches = {}
-                for did in all_ref_db_ids:
-                    db_p3D_ids = db_images[did].point3D_ids
-                    dbname = db_images[did].name
-                    # if dbname not in ['db/1966.jpg']:
-                    #     continue
-
-                    mkdb = feature_file[dbname]['keypoints'].__array__()
-
-                    matched_scoreq = []
-                    matched_mkpq = []
-                    matched_p3d = []
-                    matched_mkdb = []
-                    # min_obs = 100000
-                    # max_obs = 0
-                    matched_obs = []
-                    for pi in range(len(all_3D_ids)):
-                        if not inlier_mask[pi]:
-                            continue
-                        p3D_id = all_3D_ids[pi]
-                        if p3D_id in db_p3D_ids:
-                            matched_scoreq.append(all_score_q[pi])
-                            matched_mkpq.append(all_mkpq[pi])
-                            matched_p3d.append(points3D[p3D_id].xyz)
-                            mkdb_idx = list(db_p3D_ids).index(p3D_id)
-                            matched_mkdb.append(mkdb[mkdb_idx])
-
-                            obs = len(points3D[p3D_id].image_ids)
-                            matched_obs.append(obs)
-                            # if obs < min_obs:
-                            #     min_obs = obs
-                            # if obs > max_obs:
-                            #     max_obs = obs
-
-                            # print ('p3d_id/db_p3d_id: ', p3D_id, db_p3D_ids[mkdb_idx])
-                    if len(matched_p3d) == 0:
-                        continue
-
-                    dbname_matches[dbname] = {
-                        'mkpq': np.array(matched_mkpq).reshape(-1, 2),
-                        'mp3d': np.array(matched_p3d).reshape(-1, 3),
-                        'mkpdb': np.array(matched_mkdb).reshape(-1, 2),
-                        'min_obs': np.min(matched_obs),
-                        'median_obs': np.median(matched_obs),
-                        'max_obs': np.max(matched_obs),
-                        'all_obs': matched_obs,
-                        'score_q': np.array(matched_scoreq, np.float32) + 1.,
-                    }
-                    dbname_ninliers[dbname] = len(matched_p3d)
-
-                sorted_dbname_ninliers = sort_dict_by_value(data=dbname_ninliers, reverse=True)
-
-                for idx, item in enumerate(sorted_dbname_ninliers):
-
-                    dbname = item[0]
-
-                    # if dbname not in ['db/4223.jpg']:
-                    #     continue
-
-                    db_img = cv2.imread(osp.join(image_dir, dbname))
-
-                    matched_mkpq = dbname_matches[dbname]['mkpq']
-                    matched_scoreq = dbname_matches[dbname]['score_q']
-                    matched_p3d = dbname_matches[dbname]['mp3d']
-                    reproj_mkpq = reproject(points3D=matched_p3d, rvec=ret['qvec'], tvec=ret['tvec'], camera=cfg)
-                    proj_error = (matched_mkpq - reproj_mkpq) ** 2
-                    proj_error = np.sqrt(proj_error[:, 0] + proj_error[:, 1])
-                    min_proj_error = np.min(proj_error)
-                    max_proj_error = np.max(proj_error)
-                    med_proj_error = np.median(proj_error)
-                    img_proj = plot_reprojpoint2D(img=q_img, points2D=matched_mkpq, reproj_points2D=reproj_mkpq,
-                                                  # confs=matched_scoreq * 5,
-                                                  )
-                    img_proj = cv2.resize(img_proj, None, fx=0.5, fy=0.5)
-                    img_proj = cv2.putText(img_proj, 'green p2D/red-proj', (20, 30),
-                                           cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                           (0, 255, 0), 2)
-                    img_proj = cv2.putText(img_proj,
-                                           'mn/md/mx:{:.1f}/{:.1f}/{:.1f}'.format(min_proj_error, med_proj_error,
-                                                                                  max_proj_error),
-                                           (20, 60),
-                                           cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                           (0, 0, 255), 2)
-
-                    #### plot reprojection error on db images
-                    # matched_mkpq = dbname_matches[dbname]['mkpq']
-                    matched_mkdb = dbname_matches[dbname]['mkpdb']
-                    matched_obs = np.array(dbname_matches[dbname]['all_obs'], np.int) // 2
-                    # matched_p3d = dbname_matches[dbname]['mp3d']
-                    # camera_model, width, height, params = qinfo
-                    db_camera = cameras[db_images[db_name_to_id[dbname]].camera_id]
-                    db_cfg = {
-                        'model': db_camera[1],
-                        'width': db_camera[2],
-                        'height': db_camera[3],
-                        'params': db_camera[4],
-                    }
-                    reproj_mkdb = reproject(points3D=matched_p3d, rvec=db_images[db_name_to_id[dbname]].qvec,
-                                            tvec=db_images[db_name_to_id[dbname]].tvec,
-                                            camera=db_cfg)
-                    proj_error_db = (matched_mkdb - reproj_mkdb) ** 2
-                    proj_error_db = np.sqrt(proj_error_db[:, 0] + proj_error_db[:, 1])
-                    min_proj_error_db = np.min(proj_error_db)
-                    max_proj_error_db = np.max(proj_error_db)
-                    med_proj_error_db = np.median(proj_error_db)
-                    img_proj_db = plot_reprojpoint2D(img=db_img, points2D=matched_mkdb, reproj_points2D=reproj_mkdb,
-                                                     # confs=matched_obs,
-                                                     )
-                    img_proj_db = cv2.resize(img_proj_db, None, fx=0.5, fy=0.5)
-                    img_proj_db = cv2.putText(img_proj_db, 'green p2D/red-proj', (20, 30),
-                                              cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                              (0, 255, 0), 2)
-                    img_proj_db = cv2.putText(img_proj_db,
-                                              'mn/md/mx:{:.1f}/{:.1f}/{:.1f}'.format(min_proj_error_db,
-                                                                                     med_proj_error_db,
-                                                                                     max_proj_error_db),
-                                              (20, 60),
-                                              cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                              (0, 0, 255), 2)
-
-                    img_proj_db = resize_img(img_proj_db, nw=img_proj.shape[1])
-                    img_proj = np.vstack([img_proj, img_proj_db])
-
-                    img_match = plot_matches(img1=q_img, img2=db_img, pts1=matched_mkpq, pts2=matched_mkdb,
-                                             inliers=np.array([True for i in range(matched_mkpq.shape[0])], np.uint8),
-                                             )
-                    img_match = cv2.putText(img_match, 'i/o:{:d}/{:d}'.format(matched_mkpq.shape[0], idx + 1),
-                                            (20, 30),
-                                            cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                            (0, 0, 255), 2
-                                            )
-                    mn_obs = dbname_matches[dbname]['min_obs']
-                    md_obs = dbname_matches[dbname]['median_obs']
-                    mx_obs = dbname_matches[dbname]['max_obs']
-                    img_match = cv2.putText(img_match,
-                                            'obs-mn/md/mx:{:d}/{:d}/{:d}'.format(int(mn_obs),
-                                                                                 int(md_obs),
-                                                                                 int(mx_obs)),
-                                            (20, 60),
-                                            cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                            (0, 0, 255), 2)
-                    img_match = cv2.resize(img_match, None, fx=0.5, fy=0.5)
-                    img_raw = plot_matches(img1=q_img, img2=db_img, pts1=matched_mkpq, pts2=matched_mkdb,
-                                           inliers=np.array([], np.uint8))
-                    img_raw = cv2.resize(img_raw, None, fx=0.5, fy=0.5)
-
-                    # img_proj = resize_img(img_proj, nh=img_match.shape[0])
-                    # img_match = np.hstack([img_raw, img_match])
-
-                    cv2.imshow('match_ref', img_match)
-                    key = cv2.waitKey(5)
-                    if vis_dir is not None:
-                        id_str = '{:03d}'.format(idx + 1)
-                        cv2.imwrite(osp.join(vis_dir.as_posix(),
-                                             (qname.replace('/',
-                                                            '-') + '_' + opt_type + id_str + '_' + dbname.replace(
-                                                 '/',
-                                                 '-'))),
-                                    img_match)
-
-            return ret['qvec'], ret['tvec'], ret['num_inliers'], {**best_results, **{'log_info': log_info}}
-
-    closest = db_images[db_ids[0][0]]
-    print_text = 'Localize {:s} failed, but use the pose of {:s} as approximation'.format(qname, closest.name)
-    print(print_text)
-    if log_info is not None:
-        log_info += (print_text + '\n')
-    return closest.qvec, closest.tvec, 0, {**best_results, **{'log_info': log_info}}
-
-
-def pose_from_single_with_matcher(qname, qinfo, db_ids, db_images, points3D,
-                                  feature_file,
-                                  thresh,
-                                  image_dir,
-                                  matcher,
-                                  do_covisility_opt=False,
-                                  with_label=False,
-                                  vis_dir=None,
-                                  inlier_th=10,
-                                  covisibility_frame=50,
-                                  global_score=None,
-                                  seg_dir=None,
-                                  q_seg=None,
-                                  log_info=None,
-                                  opt_type="cluster",
-                                  ):
-    print("qname: ", qname)
-    q_img = cv2.imread(osp.join(image_dir, qname))
-    kpq = feature_file[qname]['keypoints'].__array__()
-    scoreq = feature_file[qname]['scores'].__array__()
-    desc_q = feature_file[qname]['descriptors'].__array__()
-    # print('kp: ', kpq.shape, desc_q.shape, scoreq.shape)
-    # feature_file[qname].keys()
-    # exit(0)
-    desc_q = desc_q.transpose()
-
-    if with_label:
-        label_q = feature_file[qname]['labels'].__array__()
-    else:
-        label_q = None
-
-    # results = {}
-    camera_model, width, height, params = qinfo
-    cfg = {
-        'model': camera_model,
-        'width': width,
-        'height': height,
-        'params': params,
-    }
-
-    best_results = {
-        'tvec': None,
-        'rvec': None,
-        'num_inliers': 0,
-        'db_id': -1,
-        'order': -1,
-        'qname': qname,
-        'dbname': db_images[db_ids[0]].name,
-    }
-    for i, db_id_cls in enumerate(db_ids):
-        if len(db_id_cls) == 1:
-            db_id = db_id_cls[0]
-        db_name = db_images[db_id].name
-        if global_score is not None:
-            if db_name in global_score.keys():
-                gscore = global_score[db_name]
-            else:
-                gscore = 0
-        else:
-            gscore = 0
-
-        text = qname + '_' + db_name
-
-        db_img = cv2.imread(osp.join(image_dir, db_name))
-
-        kpdb = feature_file[db_name]['keypoints'].__array__()
-        desc_db = feature_file[db_name]["descriptors"].__array__()
-        desc_db = desc_db.transpose()
-
-        points3D_ids = db_images[db_id].point3D_ids
-        if points3D_ids.size == 0:
-            print("No 3D points in this db image: ", db_name)
-
-            if log_info is not None:
-                log_info += ("No 3D points in this db image: {:s}\n".format(db_name))
-            continue
-
-        if with_label:
-            label_db = feature_file[db_name]["labels"].__array__()
-
-            matches = feature_matching(desc_q=desc_q, desc_db=desc_db, label_q=label_q, label_db=label_db,
-                                       matcher=matcher,
-                                       db_3D_ids=points3D_ids,
-                                       )
-
-            if seg_dir is not None:
-                db_seg = cv2.imread(osp.join(seg_dir, db_name.replace("jpg", "png")))
-            else:
-                db_seg = None
-        else:
-            matches = feature_matching(desc_q=desc_q, desc_db=desc_db, label_q=None, label_db=None,
-                                       matcher=matcher, db_3D_ids=None)
-        mp3d = []
-        mkpq = []
-        mkpdb = []
-        mp3d_ids = []
-        q_ids = []
-        for idx in range(matches.shape[0]):
-            if matches[idx] == -1:
-                continue
-            if points3D_ids[matches[idx]] == -1:
-                continue
-            id_3D = points3D_ids[matches[idx]]
-            mp3d.append(points3D[id_3D].xyz)
-            mp3d_ids.append(id_3D)
-
-            mkpq.append(kpq[idx])
-            mkpdb.append(kpdb[matches[idx]])
-
-            q_ids.append(idx)
-
-        mp3d = np.array(mp3d, np.float).reshape(-1, 3)
-        mkpq = np.array(mkpq, np.float).reshape(-1, 2) + 0.5
-
-        if mp3d.shape[0] < inlier_th:
-            print_text = "qname: {:s} dbname: {:s}({:d}/{:d}) failed because of insufficient 3d points {:d}".format(
-                qname,
-                db_name,
-                i + 1,
-                len(
-                    db_ids),
-                mp3d.shape[
-                    0])
-            print(print_text)
-            if log_info is not None:
-                log_info += (print_text + '\n')
-            continue
-
-        ret = pycolmap.absolute_pose_estimation(mkpq, mp3d, cfg, thresh)
-
-        if not ret["success"]:
-            # results.append((qname, db_name, 0))
-            print_text = "qname: {:s} dbname: {:s} ({:d}/{:d}) failed after optimization".format(qname, db_name, i + 1,
-                                                                                                 len(db_ids))
-            print(print_text)
-            if log_info is not None:
-                log_info += (print_text + '\n')
-
-        ##### plot reprojected 3D points
-        show_proj = True
-        if show_proj:
-            inliers = ret['inliers']
-            matched_points2D = [mkpq[i] for i in range(len(inliers)) if inliers[i]]
-            matched_points3D = [mp3d[i] for i in range(len(inliers)) if inliers[i]]
-            matched_points2D = np.vstack(matched_points2D)
-            matched_points3D = np.vstack(matched_points3D)
-            reproj_points2D = reproject(points3D=matched_points3D, rvec=ret['qvec'], tvec=ret['tvec'],
-                                        camera=cfg)
-
-            proj_error = (matched_points2D - reproj_points2D) ** 2
-            proj_error = np.sqrt(proj_error[:, 0] + proj_error[:, 1])
-            min_proj_error = np.min(proj_error)
-            max_proj_error = np.max(proj_error)
-            med_proj_error = np.median(proj_error)
-            # print('proj_error: ',  np.max(proj_error))
-
-            img_proj = plot_reprojpoint2D(img=q_img, points2D=matched_points2D, reproj_points2D=reproj_points2D)
-            img_proj = cv2.resize(img_proj, None, fx=0.5, fy=0.5)
-            img_proj = cv2.putText(img_proj, 'green p2D/red-proj', (20, 30),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                   (0, 255, 0), 2)
-            img_proj = cv2.putText(img_proj,
-                                   'mn/md/mx:{:.1f}/{:.1f}/{:.1f}'.format(min_proj_error, med_proj_error,
-                                                                          max_proj_error),
-                                   (20, 60),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                   (0, 0, 255), 2)
-
-            # img_proj = np.vstack([img_proj, np.zeros_like(img_proj)])
-            # img_proj = cv2.resize(img_proj, None, fx=0.5, fy=0.5)
-            # cv2.imshow('img_proj', img_proj)
-            # cv2.waitKey(5)
-
-        matches = np.array(ret['inliers'], np.bool).reshape(-1, 1)
-        inlier_p3d_ids = [mp3d_ids[i] for i in range(len(ret['inliers'])) if ret['inliers'][i]]
-        # print('matches: ', matches.shape, len(inlier_p3d_ids))
-        # print(type(ret['inliers']), ret['inliers'])
-        # exit(0)
-        img_match = plot_matches(img1=q_img, img2=db_img,
-                                 pts1=mkpq, pts2=mkpdb,
-                                 inliers=matches)
-        img_match = cv2.putText(img_match, 'm/i/r/o:{:d}/{:d}/{:.2f}/{:d}/{:.4f}'.format(
-            mkpq.shape[0], ret['num_inliers'], ret['num_inliers'] / mkpq.shape[0], i + 1, gscore), (50, 30),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1,
-                                (0, 0, 255), 2)
-
-        # cv2.namedWindow("match", cv2.WINDOW_NORMAL)
-
-        img_match = cv2.resize(img_match, None, fx=0.5, fy=0.5)
-        if q_seg is not None and db_seg is not None:
-            q_seg = cv2.resize(q_seg, dsize=(q_img.shape[1], q_img.shape[0]), interpolation=cv2.INTER_NEAREST)
-            db_seg = cv2.resize(db_seg, dsize=(db_img.shape[1], db_img.shape[0]), interpolation=cv2.INTER_NEAREST)
-            seg_match = plot_matches(img1=q_seg, img2=db_seg,
-                                     pts1=mkpq, pts2=mkpdb,
-                                     inliers=matches)
-            seg_match = cv2.resize(seg_match, None, fx=0.5, fy=0.5)
-            img_match = np.hstack([img_match, seg_match])
-
-            if show_proj:
-                img_proj = resize_img(img_proj, nh=img_match.shape[0])
-                img_match = np.hstack([img_match, img_proj])
-            # print('img_match: ', img_match.shape, img_proj.shape)
-        cv2.imshow("match", img_match)
-
-        key = cv2.waitKey(5)
-
-        if vis_dir is not None:
-            id_str = '{:03d}'.format(i + 1)
-            cv2.imwrite(osp.join(vis_dir.as_posix(),
-                                 (qname.replace('/', '-') + '_' + id_str + '_' + db_name.replace('/', '-'))),
-                        img_match)
-
-        if ret['num_inliers'] < inlier_th:
-            print_text = "qname: {:s} dbname: {:s} ({:d}/{:d}) failed insufficient {:d} inliers".format(qname, db_name,
-                                                                                                        i + 1,
-                                                                                                        len(db_ids),
-                                                                                                        ret[
-                                                                                                            "num_inliers"])
-            print(print_text)
-            if log_info is not None:
-                log_info += (print_text + '\n')
-            continue
-
-        print_text = "qname: {:s} dbname: {:s} ({:d}/{:d}) succeed with {:d} inliers".format(qname, db_name, i + 1,
-                                                                                             len(db_ids),
-                                                                                             ret["num_inliers"])
-        print(print_text)
-        if log_info is not None:
-            log_info += (print_text + '\n')
-
-        if do_covisility_opt:  # and ret['num_inliers'] <= 200:
-            if opt_type == "proj":
-                q_p3d_ids = {}
-                for i in range(len(ret['inliers'])):
-                    if ret['inliers'][i]:
-                        q_p3d_ids[q_ids[i]] = mp3d_ids[i]
-                ret = pose_refinment_covisibility_by_projection(qname=qname, cfg=cfg, feature_file=feature_file,
-                                                                db_frame_id=db_id,
-                                                                db_images=db_images, points3D=points3D,
-                                                                thresh=thresh, with_label=with_label,
-                                                                covisibility_frame=covisibility_frame,
-                                                                matcher=matcher,
-                                                                ref_3Dpoints=inlier_p3d_ids,
-                                                                q_p3d_ids=q_p3d_ids,
-                                                                radius=20,
-                                                                qvec=ret['qvec'],
-                                                                tvec=ret['tvec'],
-                                                                n_can_3Ds=50, )
-            elif opt_type == "cluster":
-                ret = pose_refinement_covisibility(qname=qname, cfg=cfg, feature_file=feature_file, db_frame_id=db_id,
-                                                   db_images=db_images,
-                                                   points3D=points3D,
-                                                   thresh=thresh,
-                                                   with_label=with_label,
-                                                   covisibility_frame=covisibility_frame,
-                                                   matcher=matcher,
-                                                   ref_3Dpoints=inlier_p3d_ids,
-                                                   )
-
-            if ret['num_inliers'] < 50:
-                print_text = 'Find {:d} inliers after covisible refinement, failed'.format(ret['num_inliers'])
-                print(print_text)
-                if log_info is not None:
-                    log_info += (print_text + '\n')
-                if ret['num_inliers'] > best_results['num_inliers']:
-                    best_results['qvec'] = ret['qvec']
-                    best_results['tvec'] = ret['qvec']
-                    best_results['num_inliers'] = ret['num_inliers']
-                    best_results['dbname'] = db_name
-                    best_results['order'] = i + 1
-
-                continue
-
-        print_text = text + "_succeed with {:d} ({:d}/{:d}) inliers".format(ret["num_inliers"], i + 1, len(db_ids))
-        print(print_text)
-        if log_info is not None:
-            log_info += (print_text + '\n')
-
-        # localization succeed
-        qvec = ret['qvec']
-        tvec = ret['tvec']
-        ret['cfg'] = cfg
-        inliers = ret['inliers']
-        num_inliers = ret['num_inliers']
-
-        if num_inliers > best_results['num_inliers']:
-            best_results['qvec'] = ret['qvec']
-            best_results['tvec'] = ret['qvec']
-            best_results['num_inliers'] = num_inliers
-            best_results['dbname'] = db_name
-            best_results['order'] = i + 1
-
-        return qvec, tvec, num_inliers, best_results
-
-    if best_results['num_inliers'] >= inlier_th:
-        return best_results['qvec'], best_results['tvec'], best_results['num_inliers'], best_results
-    closest = db_images[db_ids[0]]
-    return closest.qvec, closest.tvec, 0, best_results
-
-def estimate_pose_with_matcher(matcher, image_dir, reference_sfm, queries, retrieval, features, results, log_fn,
-                               ransac_thresh=12, with_label=False, query_list=None, do_covisible_opt=False,
-                               inlier_th=10,
-                               covisibility_frame=50,
-                               vis_dir=None):
-    assert reference_sfm.exists(), reference_sfm
-    assert retrieval.exists(), retrieval
-    assert features.exists(), features
-
-    if vis_dir is not None:
-        Path(vis_dir).mkdir(exist_ok=True)
-    # assert matches.exists(), matches
-
-    print("Reading queries...")
-    queries = parse_image_lists_with_intrinsics(queries)
-
-    print("Reading retrieval...")
-    retrieval_dict = parse_retrieval(retrieval)
-
-    print('Reading 3D model from: ', reference_sfm)
-    _, db_images, points3D = read_model(str(reference_sfm), '.bin')
-    db_name_to_id = {image.name: i for i, image in db_images.items()}
-    feature_file = h5py.File(features, 'r')
-
-    poses = {}
-    logging.info('Starting localization...')
-
-    failed_cases = []
-    all_logs = []
-
-    n_total = 0
-    n_failed = 0
-    for qname, qinfo in tqdm(queries):
-        if query_list is not None:
-            if str(qname) not in query_list:
-                continue
-
-        db_names = retrieval_dict[qname]
-        db_ids = []
-        for n in db_names:
-            if n not in db_name_to_id:
-                logging.warning(f'Image {n} was retrieved but not in database')
-                continue
-            db_ids.append(db_name_to_id[n])
-
-        # qvec, tvec, inlier_idxs, n_inliers = pose_from_pnp(qname, qinfo, db_ids, db_images, points3D,
-        #                                                    feature_file, match_file, thresh=ransac_thresh,
-        #                                                    image_dir=image_dir)
-        qvec, tvec, n_inliers, logs = pose_from_single_with_matcher(qname, qinfo, db_ids, db_images,
-                                                                    points3D,
-                                                                    feature_file,
-                                                                    thresh=ransac_thresh,
-                                                                    image_dir=image_dir,
-                                                                    matcher=matcher,
-                                                                    with_label=with_label,
-                                                                    do_covisility_opt=do_covisible_opt,
-                                                                    vis_dir=vis_dir,
-                                                                    inlier_th=inlier_th,
-                                                                    covisibility_frame=covisibility_frame,
-                                                                    )
-
-        all_logs.append(logs)
-
-        n_total += 1
-
-        if n_inliers == 0:
-            failed_cases.append(qname)
-            n_failed += 1
-
-        poses[qname] = (qvec, tvec)
-
-        print("All {:d}/{:d} failed cases".format(n_failed, n_total))
-
-    logs_path = f'{results}.failed'
-    # logging.info(f'Writing logs to {logs_path}...')
-    with open(logs_path, 'w') as f:
-        for v in failed_cases:
-            print(v)
-            f.write(v + "\n")
-
-    logging.info(f'Localized {len(poses)} / {len(queries)} images.')
-    logging.info(f'Writing poses to {results}...')
-    with open(results, 'w') as f:
-        for q in poses:
-            qvec, tvec = poses[q]
-            qvec = ' '.join(map(str, qvec))
-            tvec = ' '.join(map(str, tvec))
-            name = q.split('/')[-1]
-            f.write(f'{name} {qvec} {tvec}\n')
-
-    # logs_path = f'{results}_logs.pkl'
-    # logging.info(f'Writing logs to {logs_path}...')
-    # with open(logs_path, 'wb') as f:
-    #     pickle.dump(logs, f)
-    logging.info('Done!')
-
-    with open(log_fn, 'w') as f:
-        for v in all_logs:
-            f.write('{:s} {:s} {:d} {:d}\n'.format(v['qname'], v['dbname'], v['num_inliers'], v['order']))
-
-
-def main(image_dir, reference_sfm, queries, retrieval, features, matches, results,
-         ransac_thresh=12, covisibility_clustering=False):
-    assert reference_sfm.exists(), reference_sfm
-    assert retrieval.exists(), retrieval
-    assert features.exists(), features
-    assert matches.exists(), matches
-
-    queries = parse_image_lists_with_intrinsics(queries)
-    retrieval_dict = parse_retrieval(retrieval)
-
-    logging.info('Reading 3D model...')
-    _, db_images, points3D = read_model(str(reference_sfm), '.bin')
-    db_name_to_id = {image.name: i for i, image in db_images.items()}
-
-    feature_file = h5py.File(features, 'r')
-    match_file = h5py.File(matches, 'r')
-
-    poses = {}
-    logs = {
-        'features': features,
-        'matches': matches,
-        'retrieval': retrieval,
-        'loc': {},
-    }
-    logging.info('Starting localization...')
-
-    failed_cases = []
-    for qname, qinfo in tqdm(queries):
-        db_names = retrieval_dict[qname]
-        db_ids = []
-        for n in db_names:
-            if n not in db_name_to_id:
-                logging.warning(f'Image {n} was retrieved but not in database')
-                continue
-            db_ids.append(db_name_to_id[n])
-
-        # qvec, tvec, inlier_idxs, n_inliers = pose_from_pnp(qname, qinfo, db_ids, db_images, points3D,
-        #                                                    feature_file, match_file, thresh=ransac_thresh,
-        #                                                    image_dir=image_dir)
-        qvec, tvec, inlier_idxs, n_inliers = pose_from_single(qname, qinfo, db_ids, db_images, points3D,
-                                                              feature_file, match_file, thresh=ransac_thresh,
-                                                              image_dir=image_dir)
-
-        if n_inliers == 0:
-            failed_cases.append(qname)
-
-        logs[qname] = {
-            'db': db_ids,
-            'inlier_idxs': inlier_idxs,
-            'n_inliers': n_inliers
-        }
-
-        poses[qname] = (qvec, tvec)
-
-    logging.info(f'Localized {len(poses)} / {len(queries)} images.')
-    logging.info(f'Writing poses to {results}...')
-    with open(results, 'w') as f:
-        for q in poses:
-            qvec, tvec = poses[q]
-            qvec = ' '.join(map(str, qvec))
-            tvec = ' '.join(map(str, tvec))
-            name = q.split('/')[-1]
-            f.write(f'{name} {qvec} {tvec}\n')
-
-    logs_path = f'{results}_logs.pkl'
-    logging.info(f'Writing logs to {logs_path}...')
-    with open(logs_path, 'wb') as f:
-        pickle.dump(logs, f)
-    logging.info('Done!')
-
-    print("Failed cases: ", failed_cases)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--image_dir', type=str,
-                        default="/home/mifs/fx221/fx221/localization/aachen_v1_1/images/images_upright")
-    parser.add_argument('--reference_sfm', type=Path, required=True)
-    parser.add_argument('--queries', type=Path, required=True)
-    parser.add_argument('--features', type=Path, required=True)
-    parser.add_argument('--matches', type=Path, required=True)
-    parser.add_argument('--retrieval', type=Path, required=True)
-    parser.add_argument('--results', type=str, required=True)
-    parser.add_argument('--log_fn', type=str, required=True)
-    parser.add_argument('--vis_dir', type=str, default=None)
-    parser.add_argument('--ransac_thresh', type=float, default=12.0)
-    parser.add_argument('--inlier_th', type=float, default=10.0)
-    parser.add_argument('--covisibility_frame', type=int, default=50)
-    parser.add_argument('--covisibility_clustering', action='store_true')
-    parser.add_argument('--with_match', action='store_true')
-    parser.add_argument('--with_label', action='store_true')
-    parser.add_argument('--do_covisible_opt', action='store_true')
-    parser.add_argument('--matcher_method', type=str, default="NNM")
-    args = parser.parse_args()
-
-    if args.with_match:
-        matcher = Matcher(conf=confs[args.matcher_method])
-        matcher = matcher.eval().cuda()
-
-        print("matcher: ", matcher)
-
-        query_list = []
-        with open(args.retrieval, "r") as f:
-            lines = f.readlines()
-            for l in lines:
-                l = l.strip().split(' ')
-                if l[0] not in query_list:
-                    query_list.append(l[0])
-
-        log_fn = args.log_fn + '_th' + str(args.inlier_th)
-        vis_dir = args.vis_dir + '_th' + str(args.inlier_th)
-        results = args.results + '_th' + str(args.inlier_th)
-        if args.do_covisible_opt:
-            log_fn = log_fn + '_opt' + str(args.covisibility_frame)
-            vis_dir = vis_dir + '_opt' + str(args.covisibility_frame)
-            results = results + '_opt' + str(args.covisibility_frame)
-
-        log_fn = Path(log_fn + '.log')
-        results = Path(results + '.txt')
-        vis_dir = Path(vis_dir)
-
-        estimate_pose_with_matcher(matcher=matcher, image_dir=args.image_dir,
-                                   reference_sfm=args.reference_sfm,
-                                   queries=args.queries,
-                                   retrieval=args.retrieval,
-                                   features=args.features,
-                                   results=results,
-                                   log_fn=log_fn,
-                                   ransac_thresh=8,
-                                   with_label=args.with_label,
-                                   query_list=query_list,
-                                   do_covisible_opt=args.do_covisible_opt,
-                                   vis_dir=vis_dir,
-                                   inlier_th=args.inlier_th,
-                                   covisibility_frame=args.covisibility_frame,
-                                   )
-    else:
-        main(**args.__dict__)
 
 # opencv-contrib-python         3.4.2.16
 # opencv-python                 3.4.2.16

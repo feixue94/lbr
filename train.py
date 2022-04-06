@@ -24,13 +24,9 @@ from tools.common import torch_set_gpu
 import torchvision.transforms as tvf
 
 
-def get_train_val_loader(args, tag='obs2'):
+def get_train_val_loader(args):
     train_transform = tvf.Compose(
         (
-            # tvf.ToPILImage(),
-            # tvf.RandomRotation(10),
-            # tvf.RandomCrop(224),
-            # tvf.RandomHorizontalFlip(),
             tvf.ToTensor(),
             # tvf.ColorJitter(0.25, 0.25, 0.25, 0.15),
             tvf.ColorJitter(0.25, 0.25, 0.25, 0.15),
@@ -40,8 +36,6 @@ def get_train_val_loader(args, tag='obs2'):
     )
     val_transform = tvf.Compose(
         (
-            # tvf.ToPILImage(),
-            # tvf.Resize(224),
             tvf.ToTensor(),
             tvf.Normalize(mean=[0.485, 0.456, 0.406],
                           std=[0.229, 0.224, 0.225])
@@ -169,13 +163,6 @@ def main(args):
                        out_channels=args.out_channels,
                        classification=args.classification,
                        segmentation=args.segmentation, )
-    # if len(args.gpu) == 1:
-    #     model = model.cuda()
-    # else:
-    #     device_ids = [i for i in range(len(args.gpu))]
-    #     model = torch.nn.DataParallel(model, device_ids=device_ids).cuda()
-    #     # model = torch.nn.DataParallel(model, device_ids=args.gpu).cuda()
-
     print(model)
     label_weights = torch.ones([args.classes]).cuda()
     label_weights[0] = 0.5

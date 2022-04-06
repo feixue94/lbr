@@ -33,10 +33,12 @@ def get_recursive_file_list(root_dir, sub_dir="", patterns=[]):
             all_files.append(osp.join(sub_dir, file_name))
 
         if os.path.isdir(full_file_name):
-            next_level_files = get_recursive_file_list(root_dir, sub_dir=osp.join(sub_dir, file_name), patterns=patterns)
+            next_level_files = get_recursive_file_list(root_dir, sub_dir=osp.join(sub_dir, file_name),
+                                                       patterns=patterns)
             all_files.extend(next_level_files)
 
     return all_files
+
 
 def sort_dict_by_value(data, reverse=False):
     return sorted(data.items(), key=lambda d: d[1], reverse=reverse)
@@ -131,15 +133,14 @@ def imgs2video(im_dir, video_dir):
     img_fns = [v for v in img_fns if v.split('.')[-1] in ['jpg', 'png']]
     img_fns = sorted(img_fns)
     # print(img_fns)
-    # 输出视频路径
     fps = 1
     img_size = (800, 492)
 
     # fourcc = cv2.cv.CV_FOURCC('M','J','P','G')#opencv2.4
     # fourcc = cv2.VideoWriter_fourcc('I','4','2','0')
 
-    fourcc = cv2.VideoWriter_fourcc(*'MP4V')  # 设置输出视频为mp4格式
-    # fourcc = cv2.VideoWriter_fourcc('M', 'P', '4', 'V')  # 设置输出视频为mp4格式
+    fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+    # fourcc = cv2.VideoWriter_fourcc('M', 'P', '4', 'V')
     videoWriter = cv2.VideoWriter(video_dir, fourcc, fps, img_size)
 
     for i in range(0, 500):
@@ -155,7 +156,6 @@ def imgs2video(im_dir, video_dir):
         videoWriter.write(frame)
 
     videoWriter.release()
-
 
 
 if __name__ == '__main__':
