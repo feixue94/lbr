@@ -14,10 +14,6 @@ seg_dir=$root/fx221/exp/shloc/robotcar/$weight_name/masks
 query_fn=$dataset/queries_with_intrinsics_rear.txt
 query_pair=datasets/robotcar/pairs-query-netvlad20-percam-perloc-rear.txt
 gt_pose_fn=/data/cornucopia/fx221/localization/RobotCar-Seasons/3D-models/query_poses_v2.txt
-#
-#query_fn=$dataset/db_with_intrinsics_rear.txt
-#query_pair=/data/cornucopia/fx221/localization/outputs/robotcar-seasons/pairs-db-covis20.txt
-#gt_pose_fn=/data/cornucopia/fx221/localization/RobotCar-Seasons/3D-models/db_poses.txt
 
 
 #feat=resnete2-ms-n10000-r1600-0005-mask
@@ -42,10 +38,7 @@ gt_pose_fn=/data/cornucopia/fx221/localization/RobotCar-Seasons/3D-models/query_
 #feat=resnetxn-triv2-0001-n4096-r1024-mask
 feat=resnetxn-triv2-ms-0001-n4096-r1024-mask
 
-
-
 #feat=resnete2-msu-tr-n4096-r1024-0005-mask
-
 
 
 #matcher=NNM
@@ -53,15 +46,7 @@ matcher=NNML
 
 only_gt=0
 feature_type="feat_max"
-#feature_type="max"
-#global_score_th=0.95
 global_score_th=0.95
-#feature_type="gem_hard_max256"
-#feature_type="gem_hard_avg256"
-#global_score_th=0.6
-#feature_type="netvlad"
-#feature_type="netvlad_1024"
-#global_score_th=0.6
 
 rec_th=200
 nv_th=50
@@ -70,12 +55,6 @@ opt_thresh=8
 covisibility_frame=20
 init_type="clu"
 retrieval_type="lrnv"
-#retrieval_type="nv"
-#init_type="single"
-#opt_type="proj"
-#opt_type="proj_ras"
-#opt_type="cluster"
-#opt_type="cluref"
 opt_type="clurefpos"
 #opt_type="clurefobs"
 #opt_type="clu"

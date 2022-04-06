@@ -165,6 +165,7 @@ class PlaceRecog(data.Dataset):
 
         if self.preload:
             self.load_images()
+
     def load_images(self):
         print('Load images with random illumination changes...')
         self.imgs = {}
