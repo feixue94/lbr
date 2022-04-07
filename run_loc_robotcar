@@ -38,9 +38,6 @@ gt_pose_fn=/data/cornucopia/fx221/localization/RobotCar-Seasons/3D-models/query_
 #feat=resnetxn-triv2-0001-n4096-r1024-mask
 feat=resnetxn-triv2-ms-0001-n4096-r1024-mask
 
-#feat=resnete2-msu-tr-n4096-r1024-0005-mask
-
-
 #matcher=NNM
 matcher=NNML
 
@@ -56,8 +53,6 @@ covisibility_frame=20
 init_type="clu"
 retrieval_type="lrnv"
 opt_type="clurefpos"
-#opt_type="clurefobs"
-#opt_type="clu"
 k_seg=10
 k_can=1
 k_rec=20
@@ -73,6 +68,9 @@ python3 -m localization.localizer \
     --image_dir $image_dir \
     --seg_dir $seg_dir \
     --dataset robotcar \
+    --map_gid_rgb_fn datasets/robotcar/robotcar_grgb_gid.txt \
+    --db_imglist_fn  datasets/robotcar/robotcar_rear_db_imglist.txt \
+    --db_instance_fn robotcar \
     --save_root $save_root \
     --k_seg $k_seg \
     --k_can $k_can \

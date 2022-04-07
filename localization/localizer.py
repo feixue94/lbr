@@ -15,7 +15,6 @@ import logging
 import h5py
 import numpy as np
 from pathlib import Path
-from tools.common import sort_dict_by_value
 
 from localization.utils.read_write_model import read_model
 from localization.utils.parsers import (
@@ -40,6 +39,8 @@ def run(args):
                     'qvec': np.array([float(v) for v in l[1:5]], float),
                     'tvec': np.array([float(v) for v in l[5:]], float),
                 }
+                # print(l[0])
+                # exit(0)
     else:
         gt_poses = {}
 
@@ -68,13 +69,9 @@ def run(args):
                                                                      )
     if retrieval_type.find("lr") >= 0:
         weight_name = args.weight_name
-        map_gid_rgb = read_seg_map_without_group("datasets/robotcar/robotcar_grgb_gid.txt")
-        db_imglist_fn = "datasets/robotcar/robotcar_rear_db_imglist.txt"
-        save_tmp_fn = 'robotcar'
-
-        # map_gid_rgb = read_seg_map_without_group("datasets/aachen/aachen_grgb_gid_v5.txt")
-        # db_imglist_fn = "datasets/aachen/aachen_db_imglist.txt"
-        # save_tmp_fn = 'aachen_452'
+        map_gid_rgb = read_seg_map_without_group(args.map_gid_rgb_fn)
+        db_imglist_fn = args.db_imglist_fn
+        db_instance_fn = args.db_instance_fn
 
         q_pred_dir = osp.join(save_root, weight_name, "confidence")
         seg_dir = osp.join(save_root, weight_name, "masks")
@@ -92,7 +89,7 @@ def run(args):
     if retrieval_type.find("lr") >= 0:
         CLocalizer = CoarseLocalization()
         CLocalizer.load_db_rec(seg_dir=db_seg_dir, list_fn=db_imglist_fn,
-                               save_tmp_fn=save_tmp_fn)
+                               save_tmp_fn=db_instance_fn)
 
     # preparation for fine localization
     with_label = args.with_label
@@ -350,7 +347,7 @@ def run(args):
                     success[error_idx] += 1
             n_gt_total += 1
             print_text += (
-                ' q_error:{:.2f} t_error:{:.2f} {:d}/{:d}/{:d}/{:d}'.format(q_error, t_error, success[0], success[1],
+                ', q_error:{:.2f} t_error:{:.2f} {:d}/{:d}/{:d}/{:d}'.format(q_error, t_error, success[0], success[1],
                                                                             success[2], n_gt_total))
 
         print(print_text)
@@ -387,6 +384,9 @@ if __name__ == '__main__':
                         default="/home/mifs/fx221/fx221/localization/aachen_v1_1/images/images_upright", )
     parser.add_argument('--seg_dir', type=str,
                         default="/home/mifs/fx221/fx221/localization/aachen_v1_1/images/images_upright", )
+    parser.add_argument('--map_gid_rgb_fn', type=str, required=True)
+    parser.add_argument('--db_imglist_fn', type=str, required=True)
+    parser.add_argument('--db_instance_fn', type=str, required=True)
     parser.add_argument('--reference_sfm', type=Path, required=True)
     parser.add_argument('--queries', type=Path, required=True)
     parser.add_argument('--features', type=Path, required=True)

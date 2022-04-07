@@ -21,11 +21,9 @@ import numpy as np
 import pprint
 
 from localization.fine.features.extract_spp import extract_spp_return
-from localization.fine.features.extract_d2net import extract_d2net_return
 from localization.fine.features.extract_r2d2 import extract_r2d2_return, load_network
-from localization.fine.features.extract_sgd2 import extract_sgd2_return
 from net.locnets.superpoint import SuperPointNet
-from net.locnets.spd2 import SPD2L2Net, extrat_spd2_return, extract_resnet_return
+from net.locnets.resnet import extract_resnet_return
 from net.locnets.resnet import ResNetX
 
 confs = {
@@ -700,10 +698,6 @@ def get_model(model_name, weight_path):
     elif model_name == "r2d2":
         model = load_network(model_fn=weight_path).eval()
         extractor = extract_r2d2_return
-    elif model_name == 'spd2l2net':
-        model = SPD2L2Net(outdim=128).eval()
-        model.load_state_dict(torch.load(weight_path)['model'])
-        extractor = extrat_spd2_return
     elif model_name == "resnete2":
         # print(weight_path)
         model = ResNetX(encoder_depth=2)

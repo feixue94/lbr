@@ -9,8 +9,8 @@ root=/scratches/flyer_2
 dataset=$root/fx221/localization/aachen_v1_1
 outputs=$root/fx221/localization/outputs/aachen_v1_1
 image_dir=$root/fx221/localization/aachen_v1_1/images/images_upright
-#seg_dir=$root/fx221/localization/aachen_v1_1/global_seg_instance
-seg_dir=$root/fx221/localization/aachen_v1_1/global_seg_instance/remap
+seg_dir=$root/fx221/localization/aachen_v1_1/global_seg_instance
+#seg_dir=$root/fx221/localization/aachen_v1_1/global_seg_instance/remap
 save_root=$root/fx221/exp/shloc/aachen
 
 #feat=resnete2-ms-n10000-r1600-0005-mask
@@ -53,8 +53,8 @@ save_dir=/scratches/flyer_2/fx221/exp/shloc/aachen/$weight_name/loc_by_seg
 
 #query_pair="/home/mifs/fx221/Research/Code/Hierarchical-Localization/pairs/aachen_v1.1/pairs-query-netvlad50.txt"
 #query_pair="/data/cornucopia/fx221/localization/outputs_hloc/aachen_v1.1/pairs-query-netvlad50.txt"
-query_pair="datasets/aachen/pairs-query-netvlad50.txt"
-
+query_pair=datasets/aachen/pairs-query-netvlad50.txt
+gt_pose_fn=/scratches/flyer_2/fx221/localization/outputs_hloc/aachen_v1_1/Aachen-v1.1_hloc_superpoint_n4096_r1600+superglue_netvlad50.txt
 
 
 #matcher=NNM
@@ -64,24 +64,13 @@ retrieval_type="lrnv"
 #retrieval_type="lrnv256"
 feature_type="feat_max"
 global_score_th=0.95
-#feature_type="gem_hard_max256"
-#feature_type="gem_hard_avg256"
-#global_score_th=0.6
-#feature_type="netvlad"
-#feature_type="netvlad_1024"
-#global_score_th=0.6
-version="v6"
 rec_th=100
 nv_th=50
 ransac_thresh=12
 opt_thresh=12
 covisibility_frame=50
 init_type="clu"
-#init_type="single"
-#opt_type="proj"
-#opt_type="proj_ras"
-#opt_type="cluster"
-opt_type="cluref"
+opt_type="clurefpos"
 k_seg=10
 k_can=5
 k_rec=30
@@ -90,11 +79,15 @@ radius=20
 obs_thresh=3
 
 # with opt
-python3 -m localization.hloc \
+python3 -m localization.localizer \
     --image_dir $image_dir \
     --seg_dir $seg_dir \
     --save_root $save_root \
+    --gt_pose_fn $gt_pose_fn \
     --dataset aachen \
+    --map_gid_rgb_fn datasets/aachen/aachen_grgb_gid_v5.txt  \
+    --db_imglist_fn datasets/aachen/aachen_db_imglist.txt \
+    --db_instance_fn aachen_452 \
     --k_seg $k_seg \
     --k_can $k_can \
     --k_rec $k_rec \

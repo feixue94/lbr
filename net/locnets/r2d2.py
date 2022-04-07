@@ -5,19 +5,11 @@
 @Author fx221@cam.ac.uk
 @Date   2021-05-27 14:49
 =================================================='''
-
-import os, pdb
-from PIL import Image
-import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.transforms as tvf
 import torch.nn.functional as F
 
-import cv2
-from tools import common
-# from tools.dataloader import norm_RGB
-# from nets.patchnet import Quad_L2Net_ConfCFS
 RGB_mean = [0.485, 0.456, 0.406]
 RGB_std = [0.229, 0.224, 0.225]
 
@@ -162,6 +154,7 @@ def conv(in_channels, out_channels, kernel_size=3, stride=1, padding=1, use_bn=F
             nn.BatchNorm2d(out_channels, affine=False),
             nn.ReLU(),
         )
+
 
 class NonMaxSuppression(torch.nn.Module):
     def __init__(self, rel_thr=0.7, rep_thr=0.7):

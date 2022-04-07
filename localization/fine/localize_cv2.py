@@ -155,7 +155,7 @@ def get_covisibility_frames_by_pose(frame_id, pred_qvec, pred_tvec, points3D, al
             continue
         valid_db_ids.append(item[0])
 
-        print('Ref frame {:d} from obs'.format(len(valid_db_ids)))
+        # print('Ref frame {:d} from obs'.format(len(valid_db_ids)))
         if covisibility_frame > 0:
             if len(valid_db_ids) >= covisibility_frame:
                 break
