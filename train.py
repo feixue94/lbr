@@ -121,8 +121,6 @@ def get_train_val_loader(args):
         if args.val > 0:
             valset = AachenSegFull(image_path=osp.join(args.root, args.train_image_path),
                                    label_path=osp.join(args.root, args.train_label_path),
-                                   # cats=["images_aug/images_upright"],
-                                   # cats=args.val_cats,
                                    n_classes=args.classes,
                                    transform=val_transform,
                                    grgb_gid_file=grgb_gid_file,
@@ -175,7 +173,7 @@ def main(args):
         hiera_weight=0,
         label_weights=label_weights).cuda()
 
-    train_loader, val_loader, map_gid_rgb = get_train_val_loader(args=args, tag=args.tag)
+    train_loader, val_loader, map_gid_rgb = get_train_val_loader(args=args)
     trainer = RecogTrainer(model=model, train_loader=train_loader, eval_loader=val_loader if args.val else None,
                            loss_func=loss_func, args=args, map=map_gid_rgb)
 
@@ -196,28 +194,23 @@ if __name__ == '__main__':
     parser.add_argument("--groups", type=int, default=1000)
     parser.add_argument("--classes", type=int, default=400)
     parser.add_argument("--out_channels", type=int, default=512)
-    parser.add_argument("--root", type=str, default="/home/mifs/fx221/data/cam_street_view")
-    parser.add_argument("--train_label_path", type=str,
-                        default="camvid_360_cvpr18_P2_training_data/building_only_filtered1_hand_labels_prop")
-    parser.add_argument("--train_image_path", type=str, default="camvid_360_cvpr18_P2_training_data/images_hand")
-    parser.add_argument("--val_label_path", type=str,
-                        default="camvid_360_cvpr18_P4_testing_data/building_only_filtered1_hand_labels_prop")
-    parser.add_argument("--val_image_path", type=str, default="camvid_360_cvpr18_P4_testing_data/images_hand")
+    parser.add_argument("--root", type=str)
+    parser.add_argument("--train_label_path", type=str)
+    parser.add_argument("--train_image_path", type=str)
+    parser.add_argument("--val_label_path", type=str)
+    parser.add_argument("--val_image_path", type=str)
     parser.add_argument("--bs", type=int, default=4)
     parser.add_argument("--R", type=int, default=256)
     parser.add_argument("--weight_decay", type=float, default=5e-4)
-    parser.add_argument("--epochs", type=int, default=180)
+    parser.add_argument("--epochs", type=int, default=120)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--log_interval", type=int, default=50)
     parser.add_argument("--optimizer", type=str, default=None)
     parser.add_argument("--resume", type=str, default=None)
     parser.add_argument("--segloss", type=str, default='ce')
-    # parser.add_argument("--save_dir", type=str, default=None)
-    parser.add_argument("--spp", dest="spp", action="store_true", default=False)
     parser.add_argument("--classification", dest="classification", action="store_true", default=True)
     parser.add_argument("--segmentation", dest="segmentation", action="store_true", default=True)
-    parser.add_argument("--hierarchical", dest="hierarchical", action="store_true", default=False)
     parser.add_argument("--val", dest="val", action="store_true", default=False)
     parser.add_argument("--aug", dest="aug", action="store_true", default=False)
     parser.add_argument("--preload", dest="preload", action="store_true", default=False)
@@ -227,7 +220,7 @@ if __name__ == '__main__':
     parser.add_argument("--encoder_name", type=str, default='timm-resnest50d')
     parser.add_argument("--encoder_weights", type=str, default='imagenet')
     parser.add_argument("--save_root", type=str, default="/home/mifs/fx221/fx221/exp/shloc/aachen")
-    parser.add_argument("--tag", type=str, default=None)
+    # parser.add_argument("--tag", type=str, default=None)
     parser.add_argument("--gpu", type=int, nargs='+', default=[0], help='-1 for CPU')
     parser.add_argument("--milestones", type=list, default=[60, 80])
     parser.add_argument("--grgb_gid_file", type=str)

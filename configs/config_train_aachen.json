@@ -2,9 +2,10 @@
   "name": "SHLoc",
   "dataset": "aachen",
   "gpu": [
-    7
+    0
   ],
-  "root": "/home/mifs/fx221/fx221/localization/aachen_v1_1",
+  "root": "/scratches/flyer_2/fx221/localization/aachen_v1_1",
+  "save_root": "/scratches/flyer_2/fx221/exp/shloc/aachen",
   "train_label_path": "global_seg_instance",
   "train_image_path": "stylized",
   "val_label_path": "global_seg_instance",
