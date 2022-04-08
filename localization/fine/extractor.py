@@ -24,10 +24,9 @@ from localization.fine.features.extract_spp import extract_spp_return
 from localization.fine.features.extract_r2d2 import extract_r2d2_return, load_network
 from net.locnets.superpoint import SuperPointNet
 from net.locnets.resnet import extract_resnet_return
-from net.locnets.resnet import ResNetX
+from net.locnets.resnet import ResNetXN
 
 confs = {
-    # 'superpoint_aachen': {
     'superpoint-n2000-r1024-mask': {
         'output': 'feats-superpoint-n2000-r1024-mask',
         'model': {
@@ -77,45 +76,6 @@ confs = {
         },
         'mask': True,
     },
-
-    'r2d2-rmax1600-10k-mask': {
-        'output': 'feats-r2d2-rmax1600-10k-mask',
-        'model': {
-            'name': 'r2d2',
-            'rel_th': 0.7,
-            'rep_th': 0.7,
-            'nms_radius': 4,
-            'multiscale': True,
-            'max_keypoints': 10000,
-            'model_fn': osp.join(os.getcwd(), "models/r2d2_WASF_N16.pt"),
-            'scales': [1.2, 1.0, 0.8],
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': True,
-    },
-
-    'r2d2-rmax1600-10k': {
-        'output': 'feats-r2d2-rmax1600-10k',
-        'model': {
-            'name': 'r2d2',
-            'rel_th': 0.7,
-            'rep_th': 0.7,
-            'multiscale': True,
-            'max_keypoints': 10000,
-            'model_fn': osp.join(os.getcwd(), "models/r2d2_WASF_N16.pt"),
-            'scales': [1.2, 1.0, 0.8],
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-    },
-
     'superpoint-n4096-r1024-mask': {
         'output': 'feats-superpoint-n4096-r1024-mask',
         'model': {
@@ -148,15 +108,34 @@ confs = {
         'mask': False,
     },
 
-    'spd2l2net-ms-n4096-r1024-0001-mask': {
-        'output': 'feats-spd2l2net-ms-n4096-r1024-0001-mask',
+    'resnetxn-ori-0005-n4096-r1024-mask': {
+        'output': 'feats-resnetxn-ori-0005-n4096-r1024-mask',
         'model': {
-            'name': 'spd2l2net',
+            'name': 'resnetxn',
+            'max_keypoints': 4096,
+            'conf_th': 0.005,
+            'multiscale': True,
+            'scales': [1.0],
+            'model_fn': osp.join(os.getcwd(),
+                                 "models/resnetxn_ori_40.pth"),
+        },
+        'preprocessing': {
+            'grayscale': False,
+            'resize_max': 1024,
+        },
+        'mask': True,
+    },
+
+    'resnetxn-ori-0001-n4096-r1024-mask': {
+        'output': 'feats-resnetxn-ori-0001-n4096-r1024-mask',
+        'model': {
+            'name': 'resnetxn',
             'max_keypoints': 4096,
             'conf_th': 0.001,
             'multiscale': True,
-            'model_fn': osp.join(os.getcwd(), "models/spd2l2net_wap_B6_D128_R192_N16.best.pth"),
-            'scales': [1.2, 1.0, 0.8],
+            'scales': [1.0],
+            'model_fn': osp.join(os.getcwd(),
+                                 "models/resnetxn_ori_40.pth"),
         },
         'preprocessing': {
             'grayscale': False,
@@ -165,354 +144,151 @@ confs = {
         'mask': True,
     },
 
-    'resnete2-ap-n4096-r1600-0005-mask': {
-        'output': 'feats-resnete2-ap-n4096-r1600-0005-mask',
+    'resnetxn-ori-0005-n4096-r1600-mask': {
+        'output': 'feats-resnetxn-ori-0005-n4096-r1600-mask',
         'model': {
-            'name': 'resnete2',
+            'name': 'resnetxn',
             'max_keypoints': 4096,
             'conf_th': 0.005,
             'multiscale': True,
             'scales': [1.0],
             'model_fn': osp.join(os.getcwd(),
-                                 "models/epoch_39.pth"),
+                                 "models/resnetxn_ori_40.pth"),
         },
         'preprocessing': {
             'grayscale': False,
             'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': True,
-    },
-    'resnete2-ap-n4096-r1024-0005-mask': {
-        'output': 'feats-resnete2-ap-n4096-r1024-0005-mask',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 4096,
-            'conf_th': 0.005,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/epoch_39.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1024,
-            'resize_force': False,
         },
         'mask': True,
     },
 
-    'resnete2-ap-n4096-r1600-001-mask': {
-        'output': 'feats-resnete2-ap-n4096-r1600-001-mask',
+    'resnetxn-ori-0001-n4096-r1600-mask': {
+        'output': 'feats-resnetxn-ori-0001-n4096-r1600-mask',
         'model': {
-            'name': 'resnete2',
+            'name': 'resnetxn-ori',
             'max_keypoints': 4096,
-            'conf_th': 0.01,
+            'conf_th': 0.001,
             'multiscale': True,
             'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/epoch_39.pth"),
+            'model_fn': osp.join(os.getcwd(), "models/resnetxn_ori_40.pth"),
         },
         'preprocessing': {
             'grayscale': False,
             'resize_max': 1600,
-            'resize_force': True,
         },
         'mask': True,
     },
-    'resnete2-ap-n3000-r1600-001-mask': {
-        'output': 'feats-resnete2-ap-n3000-r1600-001-mask',
+
+    'resnetxn-triv2-0001-n4096-r1600-mask': {
+        'output': 'feats-resnetxn-triv2-0001-n4096-r1600-mask',
         'model': {
-            'name': 'resnete2',
+            'name': 'resnetxn',
+            'max_keypoints': 4096,
+            'conf_th': 0.001,
+            'multiscale': True,
+            'scales': [1.0],
+            'model_fn': osp.join(os.getcwd(), "models/resnetxn_triv2_d128_38.pth"),
+        },
+        'preprocessing': {
+            'grayscale': False,
+            'resize_max': 1600,
+        },
+        'mask': True,
+    },
+
+    'resnetxn-triv2-0001-n3000-r1600-mask': {
+        'output': 'feats-resnetxn-triv2-0001-n3000-r1600-mask',
+        'model': {
+            'name': 'resnetxn',
             'max_keypoints': 3000,
-            'conf_th': 0.01,
+            'conf_th': 0.001,
             'multiscale': True,
             'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/epoch_39.pth"),
+            'model_fn': osp.join(os.getcwd(), "models/resnetxn_triv2_d128_38.pth"),
         },
         'preprocessing': {
             'grayscale': False,
             'resize_max': 1600,
-            'resize_force': True,
         },
         'mask': True,
     },
-    'resnete2-ap-n10000-r1600-001-mask': {
-        'output': 'feats-resnete2-ap-n10000-r1600-001-mask',
+    'resnetxn-triv2-0001-n2000-r1600-mask': {
+        'output': 'feats-resnetxn-triv2-0001-n2000-r1600-mask',
         'model': {
-            'name': 'resnete2',
-            'max_keypoints': 10000,
-            'conf_th': 0.01,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/epoch_39.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': True,
-    },
-
-    'resnete2-ap-n10000-r1600-0005-mask': {
-        'output': 'feats-resnete2-ap-n10000-r1600-0005-mask',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 10000,
-            'conf_th': 0.005,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/epoch_39.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': True,
-    },
-
-    'resnete2-ms-n4096-r1600-001-mask': {
-        'output': 'feats-resnete2-ms-n4096-r1600-001-mask',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 4096,
-            'conf_th': 0.01,
-            'multiscale': True,
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/epoch_39.pth"),
-            'scales': [1.5, 1.2, 1.0],
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': True,
-    },
-
-    'resnete2-ap-ms-n4096-r1600-001-mask': {
-        'output': 'feats-resnete2-ap-ms-n4096-r1600-001-mask',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 4096,
-            'conf_th': 0.01,
-            'multiscale': True,
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/epoch_39.pth"),
-            'scales': [1.5, 1.2, 1.0],
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': True,
-    },
-
-    'resnete2-ap-ms-n4096-r1600-001': {
-        'output': 'feats-resnete2-ap-ms-n4096-r1600-001',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 4096,
-            'conf_th': 0.01,
-            'multiscale': True,
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/epoch_39.pth"),
-            'scales': [1.5, 1.2, 1.0],
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': False,
-    },
-
-    'resnete2-ms-n10000-r1600-0005-mask': {
-        'output': 'feats-resnete2-ms-n10000-r1600-0005-mask',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 10000,
-            'conf_th': 0.005,
-            'multiscale': True,
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/epoch_39.pth"),
-            'scales': [1.5, 1.2, 1.0],
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': True,
-    },
-
-    'resnete2-tr-n4096-r1600-0005': {
-        'output': 'feats-resnete2-tr-n4096-r1600-0005',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 4096,
-            'conf_th': 0.005,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/tr_epoch_31.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': False,
-    },
-
-    'resnete2-tr-n4096-r1600-0005-mask': {
-        'output': 'feats-resnete2-tr-n4096-r1600-0005-mask',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 4096,
-            'conf_th': 0.005,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/tr_epoch_31.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': True,
-    },
-
-    'resnete2-tr-n4096-r1024-0005-mask': {
-        'output': 'feats-resnete2-tr-n4096-r1024-0005-mask',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 4096,
-            'conf_th': 0.005,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/tr_epoch_31.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1024,
-        },
-        'mask': True,
-    },
-
-    'resnete2-tr-n3000-r1600-0005': {
-        'output': 'feats-resnete2-tr-n3000-r1600-0005',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 3000,
-            'conf_th': 0.005,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/tr_epoch_31.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': False,
-    },
-
-    'resnete2-tr-n3000-r1600-0005-mask': {
-        'output': 'feats-resnete2-tr-n3000-r1600-0005-mask',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 3000,
-            'conf_th': 0.005,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/tr_epoch_31.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': True,
-    },
-
-    'resnete2-tr-n2000-r1600-0005-mask': {
-        'output': 'feats-resnete2-tr-n2000-r1600-0005-mask',
-        'model': {
-            'name': 'resnete2',
+            'name': 'resnetxn',
             'max_keypoints': 2000,
-            'conf_th': 0.005,
+            'conf_th': 0.001,
             'multiscale': True,
             'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/tr_epoch_31.pth"),
+            'model_fn': osp.join(os.getcwd(), "models/resnetxn_triv2_d128_38.pth"),
         },
         'preprocessing': {
             'grayscale': False,
             'resize_max': 1600,
-            'resize_force': True,
         },
         'mask': True,
     },
 
-    'resnete2-tr-n1000-r1600-0005-mask': {
-        'output': 'feats-resnete2-tr-n1000-r1600-0005-mask',
+    'resnetxn-triv2-0001-n1000-r1600-mask': {
+        'output': 'feats-resnetxn-triv2-0001-n1000-r1600-mask',
         'model': {
-            'name': 'resnete2',
+            'name': 'resnetxn',
             'max_keypoints': 1000,
-            'conf_th': 0.005,
+            'conf_th': 0.001,
             'multiscale': True,
             'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/tr_epoch_31.pth"),
+            'model_fn': osp.join(os.getcwd(), "models/resnetxn_triv2_d128_38.pth"),
         },
         'preprocessing': {
             'grayscale': False,
             'resize_max': 1600,
-            'resize_force': True,
         },
         'mask': True,
     },
 
-    'resnete2-tr-n4096-r1600-001-mask': {
-        'output': 'feats-resnete2-tr-n4096-r1600-001-mask',
+    'resnetxn-triv2-ms-0001-n4096-r1600-mask': {
+        'output': 'feats-resnetxn-triv2-ms-0001-n4096-r1600-mask',
         'model': {
-            'name': 'resnete2',
+            'name': 'resnetxn',
             'max_keypoints': 4096,
-            'conf_th': 0.01,
+            'conf_th': 0.001,
             'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/tr_epoch_31.pth"),
+            'scales': [1.2, 1.0, 0.8],
+            'model_fn': osp.join(os.getcwd(), "models/resnetxn_triv2_d128_38.pth"),
         },
         'preprocessing': {
             'grayscale': False,
             'resize_max': 1600,
-            'resize_force': True,
         },
         'mask': True,
     },
 
-    'resnete2-tr-n4096-r1024-001-mask': {
-        'output': 'feats-resnete2-tr-n4096-r1024-001-mask',
+    'resnetxn-triv2-ms-0001-n10000-r1600-mask': {
+        'output': 'feats-resnetxn-triv2-ms-0001-n10000-r1600-mask',
         'model': {
-            'name': 'resnete2',
+            'name': 'resnetxn',
+            'max_keypoints': 10000,
+            'conf_th': 0.001,
+            'multiscale': True,
+            'scales': [1.2, 1.0, 0.8],
+            'model_fn': osp.join(os.getcwd(), "models/resnetxn_triv2_d128_38.pth"),
+        },
+        'preprocessing': {
+            'grayscale': False,
+            'resize_max': 1600,
+        },
+        'mask': True,
+    },
+
+    'resnetxn-triv2-0001-n4096-r1024-mask': {
+        'output': 'feats-resnetxn-triv2-0001-n4096-r1024-mask',
+        'model': {
+            'name': 'resnetxn',
             'max_keypoints': 4096,
-            'conf_th': 0.01,
+            'conf_th': 0.001,
             'multiscale': True,
             'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/tr_epoch_31.pth"),
+            'model_fn': osp.join(os.getcwd(), "models/resnetxn_triv2_d128_38.pth"),
         },
         'preprocessing': {
             'grayscale': False,
@@ -521,16 +297,15 @@ confs = {
         'mask': True,
     },
 
-    'resnete2-tr-n3000-r1024-0005-mask': {
-        'output': 'feats-resnete2-tr-n3000-r1024-0005-mask',
+    'resnetxn-triv2-ms-0001-n4096-r1024-mask': {
+        'output': 'feats-resnetxn-triv2-ms-0001-n4096-r1024-mask',
         'model': {
-            'name': 'resnete2',
-            'max_keypoints': 3000,
-            'conf_th': 0.005,
+            'name': 'resnetxn',
+            'max_keypoints': 4096,
+            'conf_th': 0.001,
             'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/tr_epoch_31.pth"),
+            'scales': [1.2, 1.0, 0.8],
+            'model_fn': osp.join(os.getcwd(), "models/resnetxn_triv2_d128_38.pth"),
         },
         'preprocessing': {
             'grayscale': False,
@@ -539,24 +314,6 @@ confs = {
         'mask': True,
     },
 
-    'resnete2-tr-n3000-r1600-001-mask': {
-        'output': 'feats-resnete2-tr-n3000-r1600-001-mask',
-        'model': {
-            'name': 'resnete2',
-            'max_keypoints': 3000,
-            'conf_th': 0.01,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/tr_epoch_31.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-            'resize_force': True,
-        },
-        'mask': True,
-    },
 }
 
 confs_matcher = {
@@ -698,10 +455,13 @@ def get_model(model_name, weight_path):
     elif model_name == "r2d2":
         model = load_network(model_fn=weight_path).eval()
         extractor = extract_r2d2_return
-    elif model_name == "resnete2":
-        # print(weight_path)
-        model = ResNetX(encoder_depth=2)
-        model.load_state_dict(torch.load(weight_path)["model"], strict=True)
+    elif model_name == 'resnetxn-ori':
+        model = ResNetXN(encoder_depth=2, outdim=128).eval()
+        model.load_state_dict(torch.load(weight_path)['state_dict'], strict=True)
+        extractor = extract_resnet_return
+    elif model_name == 'resnetxn':
+        model = ResNetXN(encoder_depth=2, outdim=128).eval()
+        model.load_state_dict(torch.load(weight_path)['model'], strict=True)
         extractor = extract_resnet_return
 
     return model, extractor
