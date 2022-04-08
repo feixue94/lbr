@@ -23,162 +23,9 @@ import pprint
 from localization.fine.features.extract_spp import extract_spp_return
 from localization.fine.features.extract_r2d2 import extract_r2d2_return, load_network
 from net.locnets.superpoint import SuperPointNet
-from net.locnets.resnet import extract_resnet_return
-from net.locnets.resnet import ResNetXN
+from net.locnets.resnet import ResNetXN, extract_resnet_return
 
 confs = {
-    'superpoint-n2000-r1024-mask': {
-        'output': 'feats-superpoint-n2000-r1024-mask',
-        'model': {
-            'name': 'superpoint',
-            'nms_radius': 4,
-            'max_keypoints': 2000,
-            'model_fn': osp.join(os.getcwd(), "models/superpoint_v1.pth"),
-            'scales': [1.0],
-        },
-        'preprocessing': {
-            'grayscale': True,
-            'resize_max': 1024,
-        },
-        'mask': True,
-    },
-
-    'r2d2-n2000-r1024-mask': {
-        'output': 'feats-r2d2-n2000-r1024-mask',
-        'model': {
-            'name': 'r2d2',
-            'nms_radius': 4,
-            'max_keypoints': 2000,
-            'model_fn': osp.join(os.getcwd(), "models/r2d2_WASF_N16.pt"),
-            'scales': [1.0],
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1024,
-        },
-        'mask': True,
-    },
-    'r2d2-n4096-r1024-mask': {
-        'output': 'feats-r2d2-n4096-r1024-mask',
-        'model': {
-            'name': 'r2d2',
-            'rel_th': 0.7,
-            'rep_th': 0.7,
-            'nms_radius': 4,
-            'multiscale': True,
-            'max_keypoints': 4096,
-            'model_fn': osp.join(os.getcwd(), "models/r2d2_WASF_N16.pt"),
-            'scales': [1.2, 1.0, 0.8],
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1024,
-        },
-        'mask': True,
-    },
-    'superpoint-n4096-r1024-mask': {
-        'output': 'feats-superpoint-n4096-r1024-mask',
-        'model': {
-            'name': 'superpoint',
-            'nms_radius': 4,
-            'max_keypoints': 4096,
-            'model_fn': osp.join(os.getcwd(), "models/superpoint_v1.pth"),
-            'scales': [1.0],
-        },
-        'preprocessing': {
-            'grayscale': True,
-            'resize_max': 1024,
-        },
-        'mask': True,
-    },
-
-    'superpoint-n4096-r1024': {
-        'output': 'feats-superpoint-n4096-r1024',
-        'model': {
-            'name': 'superpoint',
-            'nms_radius': 4,
-            'max_keypoints': 4096,
-            'model_fn': osp.join(os.getcwd(), "models/superpoint_v1.pth"),
-            'scales': [1.0],
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1024,
-        },
-        'mask': False,
-    },
-
-    'resnetxn-ori-0005-n4096-r1024-mask': {
-        'output': 'feats-resnetxn-ori-0005-n4096-r1024-mask',
-        'model': {
-            'name': 'resnetxn',
-            'max_keypoints': 4096,
-            'conf_th': 0.005,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/resnetxn_ori_40.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1024,
-        },
-        'mask': True,
-    },
-
-    'resnetxn-ori-0001-n4096-r1024-mask': {
-        'output': 'feats-resnetxn-ori-0001-n4096-r1024-mask',
-        'model': {
-            'name': 'resnetxn',
-            'max_keypoints': 4096,
-            'conf_th': 0.001,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/resnetxn_ori_40.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1024,
-        },
-        'mask': True,
-    },
-
-    'resnetxn-ori-0005-n4096-r1600-mask': {
-        'output': 'feats-resnetxn-ori-0005-n4096-r1600-mask',
-        'model': {
-            'name': 'resnetxn',
-            'max_keypoints': 4096,
-            'conf_th': 0.005,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(),
-                                 "models/resnetxn_ori_40.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-        },
-        'mask': True,
-    },
-
-    'resnetxn-ori-0001-n4096-r1600-mask': {
-        'output': 'feats-resnetxn-ori-0001-n4096-r1600-mask',
-        'model': {
-            'name': 'resnetxn-ori',
-            'max_keypoints': 4096,
-            'conf_th': 0.001,
-            'multiscale': True,
-            'scales': [1.0],
-            'model_fn': osp.join(os.getcwd(), "models/resnetxn_ori_40.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-        },
-        'mask': True,
-    },
-
     'resnetxn-triv2-0001-n4096-r1600-mask': {
         'output': 'feats-resnetxn-triv2-0001-n4096-r1600-mask',
         'model': {
@@ -246,40 +93,6 @@ confs = {
         'mask': True,
     },
 
-    'resnetxn-triv2-ms-0001-n4096-r1600-mask': {
-        'output': 'feats-resnetxn-triv2-ms-0001-n4096-r1600-mask',
-        'model': {
-            'name': 'resnetxn',
-            'max_keypoints': 4096,
-            'conf_th': 0.001,
-            'multiscale': True,
-            'scales': [1.2, 1.0, 0.8],
-            'model_fn': osp.join(os.getcwd(), "models/resnetxn_triv2_d128_38.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-        },
-        'mask': True,
-    },
-
-    'resnetxn-triv2-ms-0001-n10000-r1600-mask': {
-        'output': 'feats-resnetxn-triv2-ms-0001-n10000-r1600-mask',
-        'model': {
-            'name': 'resnetxn',
-            'max_keypoints': 10000,
-            'conf_th': 0.001,
-            'multiscale': True,
-            'scales': [1.2, 1.0, 0.8],
-            'model_fn': osp.join(os.getcwd(), "models/resnetxn_triv2_d128_38.pth"),
-        },
-        'preprocessing': {
-            'grayscale': False,
-            'resize_max': 1600,
-        },
-        'mask': True,
-    },
-
     'resnetxn-triv2-0001-n4096-r1024-mask': {
         'output': 'feats-resnetxn-triv2-0001-n4096-r1024-mask',
         'model': {
@@ -322,7 +135,7 @@ confs_matcher = {
         'model': {
             'name': 'superglue',
             'weights': 'outdoor',
-            'sinkhorn_iterations': 50,
+            'sinkhorn_iterations': 20,
         },
     },
     'NNM': {
@@ -488,22 +301,12 @@ def main(conf, image_dir, export_dir, mask_dir=None, tag=None):
     feature_path.parent.mkdir(exist_ok=True, parents=True)
     feature_file = h5py.File(str(feature_path), 'a')
 
-    # matcher = Matcher(conf=confs_matcher['NNML'])
-    # matcher = matcher.eval()
-
     with tqdm(total=len(loader)) as t:
         for idx, data in enumerate(loader):
             t.update()
             if tag is not None:
                 if data['name'][0].find(tag) < 0:
                     continue
-            # print(data['name'][0])
-            # exit(0)
-            # if data['name'][0] in feature_file:
-            #     continue
-
-            # pred = model(map_tensor(data, lambda x: x.to(device)))
-            # print(type(data['imacccccge']))
             pred = extractor(model, img=data["image"],
                              topK=conf["model"]["max_keypoints"],
                              mask=data["mask"][0].numpy().astype(np.uint8) if "mask" in data.keys() else None,
@@ -523,10 +326,6 @@ def main(conf, image_dir, export_dir, mask_dir=None, tag=None):
                 size = np.array(data['image'].shape[-2:][::-1])
                 scales = (original_size / size).astype(np.float32)
                 pred['keypoints'] = (pred['keypoints'] + .5) * scales[None] - .5
-
-            # for k in pred.keys():
-            #     print(k, pred[k].shape)
-            # exit(0)
 
             grp = feature_file.create_group(data['name'][0])
             for k, v in pred.items():

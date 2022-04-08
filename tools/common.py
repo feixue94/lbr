@@ -3,7 +3,7 @@
 @Time ： 2021/3/15 下午3:54
 @Auth ： Fei Xue
 @File ： common.py
-@Email： xuefei@sensetime.com
+@Email： fx221@cam.ac.uk
 """
 
 import numpy as np

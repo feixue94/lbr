@@ -4,37 +4,14 @@ colmap=/home/mifs/fx221/Research/Software/bin/colmap
 dataset=/scratches/flyer_2/fx221/localization/aachen_v1_1
 outputs=/scratches/flyer_2/fx221/localization/outputs/aachen_v1_1
 
-#feat=superpoint-n2000-r1024-mask
-#feat=superpoint-n4096-r1024
-#feat=superpoint-n4096-r1024-mask
-#feat=r2d2-n4096-r1024-mask
-#feat=spd2l2net-ms-n4096-r1024-0001-mask
-#feat=r2d2-rmax1600-10k-mask
-#feat=resnete2-n4096-r1600-0005-mask
-#feat=resnete2-ms-n4096-r1600-001-mask
-#feat=resnete2-ms-n10000-r1600-0005-mask
-#feat=resnete2-ap-ms-n4096-r1600-001
-#feat=resnete2-ap-ms-n4096-r1600-001-mask
-#feat=resnete2-ap-n4096-r1600-0005-mask
-
-#feat=resnete2-ap-n10000-r1600-0005-mask
-#feat=resnete2-ap-n4096-r1600-001-mask
-#feat=resnete2-ap-n10000-r1600-001-mask
-#feat=resnete2-ap-n3000-r1600-001-mask
-
-#feat=resnete2-tr-n3000-r1600-001-mask
-#feat=resnete2-tr-n4096-r1600-001-mask
-#feat=resnete2-tr-n3000-r1600-0005-mask
-feat=resnete2-tr-n4096-r1600-0005-mask
-#feat=resnete2-tr-n2000-r1600-0005-mask
-#feat=resnete2-tr-n1000-r1600-0005-mask
-
-#feat=resnete2-tr-n3000-r1600-0005
-#feat=resnete2-tr-n4096-r1600-0005
+#feat=resnetxn-triv2-0001-n4096-r1600-mask
+#feat=resnetxn-triv2-0001-n3000-r1600-mask
+#feat=resnetxn-triv2-0001-n2000-r1600-mask
+feat=resnetxn-triv2-0001-n1000-r1600-mask
 
 
 image_dir=$dataset/images/images_upright
-mask_dir=scratches/flyer_2/fx221/localization/aachen_v1_1/global_seg_instance
+mask_dir=$dataset/global_seg_instance
 
 matcher=NNML
 #matcher=NNM

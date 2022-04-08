@@ -84,9 +84,6 @@ def get_train_val_loader(args):
                                      preload=False,
                                      train=False)
     elif args.dataset == "aachen":
-        # grgb_gid_file = "./datasets/aachen/aachen_grgb_gid.txt"
-        # train_imglist = "./datasets/aachen/aachen_train_file_list.txt"
-        # test_imglist = "./datasets/aachen/aachen_test_file_list.txt"
         grgb_gid_file = args.grgb_gid_file
         train_imglist = args.train_imglist
         test_imglist = args.test_imglist
@@ -191,7 +188,6 @@ if __name__ == '__main__':
     parser.add_argument("--dataset", type=str, default="small", help="small, large, robotcar")
     parser.add_argument("--network", type=str, default="unet")
     parser.add_argument("--loss", type=str, default="ce")
-    parser.add_argument("--groups", type=int, default=1000)
     parser.add_argument("--classes", type=int, default=400)
     parser.add_argument("--out_channels", type=int, default=512)
     parser.add_argument("--root", type=str)
@@ -220,7 +216,6 @@ if __name__ == '__main__':
     parser.add_argument("--encoder_name", type=str, default='timm-resnest50d')
     parser.add_argument("--encoder_weights", type=str, default='imagenet')
     parser.add_argument("--save_root", type=str, default="/home/mifs/fx221/fx221/exp/shloc/aachen")
-    # parser.add_argument("--tag", type=str, default=None)
     parser.add_argument("--gpu", type=int, nargs='+', default=[0], help='-1 for CPU')
     parser.add_argument("--milestones", type=list, default=[60, 80])
     parser.add_argument("--grgb_gid_file", type=str)
