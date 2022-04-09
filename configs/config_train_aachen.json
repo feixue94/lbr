@@ -39,8 +39,8 @@
   "bs": 16,
   "R": 256,
   "optimizer": "adam",
-  "weight_decay": 0.0001,
-  "lr_policy": "poly",
+  "weight_decay": 0.0005,
+  "lr_policy": "step",
   "multi_lr": 1,
   "epochs": 120,
   "milestones": [
