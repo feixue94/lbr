@@ -18,6 +18,7 @@ matcher=NNML
 
 extract_feat=1
 match_db=1
+triangulate=1
 
 if [ "$extract_feat" -gt "0" ]; then
   python3 -m localization.fine.extractor --image_dir $image_dir --export_dir $outputs/ --conf $feat --mask_dir $mask_dir
@@ -26,3 +27,15 @@ fi
 if [ "$match_db" -gt "0" ]; then
   python3 -m localization.fine.matcher --pairs datasets/aachen/pairs-db-covis20.txt --export_dir $outputs/ --conf $matcher --features feats-$feat
 fi
+
+if [ "$triangulate" -gt "0" ]; then
+  python3 -m localization.fine.triangulate \
+   --sfm_dir $outputs/sfm_$feat-$matcher \
+    --reference_sfm_model $dataset/3D-models \
+    --image_dir $dataset/images/images_upright \
+    --pairs datasets/aachen/pairs-db-covis20.txt \
+    --features $outputs/feats-$feat.h5 \
+    --matches $outputs/feats-$feat-$matcher-pairs-db-covis20.h5 \
+    --colmap_path $colmap
+fi
+
