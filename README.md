@@ -180,5 +180,5 @@ If you use any ideas from the paper or code from this repo, please consider citi
 ## Acknowledgements
 
 Part of the code is from previous excellent works including [SuperPoint](https://github.com/magicleap/SuperPointPretrainedNetwork), [R2D2](https://github.com/naver/r2d2)
-, [hloc](https://github.com/cvg/Hierarchical-Localization). If you can find more details from their released
+, [hloc](https://github.com/cvg/Hierarchical-Localization). You can find more details from their released
 repositories if you are interested in their works. 
