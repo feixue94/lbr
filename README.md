@@ -1,7 +1,7 @@
 # Efficient Large-scale Localization by Global Instance Recognition
 
 <p align="center">
-  <img src="assets/overview.png" width="500">
+  <img src="assets/overview.png" width="1024">
 </p>
 
 * Full paper PDF: [Efficient Large-scale Localization by Global Instance Recognition](https://arxiv.org/abs/1911.11763).
@@ -136,7 +136,7 @@ you will get predicted masks of global instances, confidence maps, global featur
 ```
 
 <p align="center">
-  <img src="assets/samples/1116.png" width="256">
+  <img src="assets/samples/1116.png" width="1024">
 </p>
 
 * testing recognition on RobotCar-Seasons
@@ -146,7 +146,7 @@ you will get predicted masks of global instances, confidence maps, global featur
 ```
 
 <p align="center">
-  <img src="assets/samples/1417176916116788.png" width="256">
+  <img src="assets/samples/1417176916116788.png" width="1024">
 </p>
 
 
