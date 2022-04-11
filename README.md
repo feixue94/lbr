@@ -4,6 +4,11 @@
   <img src="assets/overview.png" width="960">
 </p>
 
+In this work, we propose to leverage global instances, which are robust to illumination and season changes for both
+coarse and fine localization. For coarse localization, instead of performing global reference search directly, we search
+for reference images from recognized global instances progressively. The recognized instances are further utilized for
+instance-wise feature detection and matching to enhance the localization accuracy.
+
 * Full paper PDF: [Efficient Large-scale Localization by Global Instance Recognition](https://arxiv.org/abs/1911.11763).
 
 * Authors: *Fei Xue, Ignas Budvytis, Daniel Olmeda Reino, Roberto Cipolla*
@@ -23,16 +28,19 @@
 ## Data preparation
 
 Please follow instructions on the [VisualLocalization Benchmark](https://www.visuallocalization.net/datasets/) to
-download images Aachen and RobotCar-Seasons datasets
+download images and reference 3D models of Aachen_v1.1 and RobotCar-Seasons datasets
 
 * [Images of Aachen_v1.1 dataset](https://data.ciirc.cvut.cz/public/projects/2020VisualLocalization/Aachen-Day-Night/)
 * [Images of RobotCar-Seasons dataset](https://data.ciirc.cvut.cz/public/projects/2020VisualLocalization/RobotCar-Seasons/)
-* Global instances of Aachen_v1.1 dataset
-* Global instances of RobotCar-Seasons dataset
 
-Since only daytime images are included in Aachen and RobotCar-Seasons database, which may cause recognition loss for
-recognition of nighttime query images, we augment the training data by generating some stylized images. The structure of
-files in Aachen_v1.1 dataset should be like this:
+You can download global instance labels used in this work here:
+
+* [Global instances of Aachen_v1.1](https://drive.google.com/file/d/17qerRcU8Iemjwz7tUtlX9syfN-WVSs4K/view?usp=sharing)
+* [Global instances of RobotCar-Seasons](https://drive.google.com/file/d/1Ns5I3YGoMCBURzWKZTxqsugeG4jUcj4a/view?usp=sharing)
+
+Since only daytime images are included in Aachen_v1.1 and RobotCar-Seasons database, which may cause huge recognition errors for the
+recognition of nighttime query images, we augment the training data by generating some stylized images, which can also
+be downloaded along with global instances. The structure of files in Aachen_v1.1 dataset should be like this:
 
 ```
 - aachen_v1.1
@@ -77,16 +85,39 @@ For RobotCar-Seasons dataset, it should be like this:
 
 ## Pretrained weights
 
-We provide the pretrained weights for local feature detection and extraction, global instance recognition for
-Aachen_v1.1 and RobotCar-Seasons datasets.
+We provide pretrained weights for local feature detection and extraction, global instance recognition for Aachen_v1.1
+and RobotCar-Seasons datasets, respectively, which can be downloaded
+from [here](https://drive.google.com/file/d/1N4j7PkZoy2CkWhS7u6dFzMIoai3ShG9p/view?usp=sharing)
 
-* [Local feature](https://drive.google.com/file/d/1N4j7PkZoy2CkWhS7u6dFzMIoai3ShG9p/view?usp=sharing)
-* [Recognition for Aachen_v1.1](https://drive.google.com/file/d/17qerRcU8Iemjwz7tUtlX9syfN-WVSs4K/view?usp=sharing)
-* [Recognition for RobotCar-Seasons](https://drive.google.com/file/d/1Ns5I3YGoMCBURzWKZTxqsugeG4jUcj4a/view?usp=sharing)
+## Testing of global instance recognition
+
+you will get predicted masks of global instances, confidence maps, global features, and visualization images.
+
+* testing recognition on Aachen_v1.1
+
+```
+./test_aachen
+```
+
+<p align="center">
+  <img src="assets/samples/1116.png" width="1024">
+</p>
+
+* testing recognition on RobotCar-Seasons
+
+```
+./test_robotcar
+```
+
+<p align="center">
+  <img src="assets/samples/1417176916116788.png" width="1024">
+</p>
 
 ## 3D Reconstruction
 
-* feature extraction and 3d reconstruction for Aachen_v1.1
+For fine localization, you also need a 3D map of the environment reconstructed by structure-from-motion.
+
+* feature extraction and 3D reconstruction for Aachen_v1.1
 
 ```
 ./run_reconstruct_aachen
@@ -99,6 +130,8 @@ Aachen_v1.1 and RobotCar-Seasons datasets.
 ```
 
 ## Localization with global instances
+Once you have the global instance masks of the query and database images and the 3D map of the scene, you can run the
+following commands for localization.
 
 * localization on Aachen_v1.1
 
@@ -126,31 +159,8 @@ you will get results like this:
 | cvpr | 24.9 / 62.3 / 86.1 | 47.5 / 73.4 / 90.0  |
 | post-cvpr | 28.1 / 66.9 / 91.8 | 46.1 / 73.6 / 92.5 |
 
-## Testing of global instance recognition
-you will get predicted masks of global instances, confidence maps, global features, and visualization images.
-
-* testing recognition on Aachen_v1.1
-
-```
-./test_aachen
-```
-
-<p align="center">
-  <img src="assets/samples/1116.png" width="1024">
-</p>
-
-* testing recognition on RobotCar-Seasons
-
-```
-./test_robotcar
-```
-
-<p align="center">
-  <img src="assets/samples/1417176916116788.png" width="1024">
-</p>
-
-
 ## Training
+If you want to retrain the recognition network, you can run the following commands.
 
 * training recognition on Aachen_v1.1
 
@@ -179,6 +189,7 @@ If you use any ideas from the paper or code from this repo, please consider citi
 
 ## Acknowledgements
 
-Part of the code is from previous excellent works including [SuperPoint](https://github.com/magicleap/SuperPointPretrainedNetwork), [R2D2](https://github.com/naver/r2d2)
-, [hloc](https://github.com/cvg/Hierarchical-Localization). You can find more details from their released
-repositories if you are interested in their works. 
+Part of the code is from previous excellent works
+including [SuperPoint](https://github.com/magicleap/SuperPointPretrainedNetwork), [R2D2](https://github.com/naver/r2d2)
+, [HLoc](https://github.com/cvg/Hierarchical-Localization). You can find more details from their released repositories
+if you are interested in their works. 
