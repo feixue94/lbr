@@ -198,33 +198,6 @@ class PSPNetF(SegmentationModel):
             init.initialize_head(self.cls_head)
 
 
-class PSPNetC(nn.Module):
-    def __init__(self, encoder_name: str = "resnet34",
-                 encoder_weights: Optional[str] = "imagenet",
-                 encoder_depth: int = 5,
-                 classes: int = 21428):
-        super(PSPNetC, self).__init__()
-        # self.encoder = get_encoder(name=encoder_name, in_channels=3,
-        #                            depth=encoder_depth,
-        #                            weights=encoder_weights)
-        # self.encoder = models.resnext50_32x4d(pretrained=True)
-        self.encoder = models.resnext101_32x8d(pretrained=True)
-        self.encoder.fc = nn.Linear(2048, classes)
-
-        # self.cls_head = nn.Sequential(
-        #     nn.AdaptiveAvgPool2d(1),
-        #     Flatten(),
-        #     nn.Linear(2048, classes, bias=True)
-        # )
-
-    def forward(self, x):
-        out = self.encoder(x)
-        # print(features[-1].shape)
-        # out = self.cls_head(features[-1])
-        # print (out.shape)
-        return {"cls": [out]}
-
-
 if __name__ == '__main__':
     net = PSPNetF(
         encoder_name="timm-resnest50d",

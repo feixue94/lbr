@@ -16,11 +16,11 @@
   "test_imglist": "./datasets/robotcar/robotcar_test_file_list.txt",
   "train_cats": [
     "overcast-reference",
-    "dusk",
-    "night-rain"
+    "overcast-reference_aug_d",
+    "overcast-reference_aug_n"
   ],
   "val_cats": [
-    "night"
+    "overcast-reference_aug_nr"
   ],
   "classes": 692,
   "weight_cls": 2.0,

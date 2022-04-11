@@ -74,13 +74,13 @@ def run(args):
         db_instance_fn = args.db_instance_fn
 
         q_pred_dir = osp.join(save_root, weight_name, "confidence")
-        seg_dir = osp.join(save_root, weight_name, "masks")
+        pred_seg_dir = osp.join(save_root, weight_name, "masks")
         db_seg_dir = args.seg_dir
         save_dir = osp.join(save_root, weight_name, "loc_by_seg")
     else:
         save_dir = osp.join(save_root, retrieval_type)
 
-    db_seg_dir = args.seg_dir
+    # db_seg_dir = args.seg_dir
     save_dir = osp.join(save_dir, weight_name, "loc_by_seg")
     save_fn = osp.join(save_dir, save_fn)
     if not osp.exists(save_dir):
@@ -208,7 +208,6 @@ def run(args):
                     if c not in db_name_to_id:
                         logging.warning(f'Image {c} was retrieved but not in database')
                         continue
-
                     full_log_info += ('{:s} {:s} {:.2f} by global search\n'.format(qname, c, 1))
                     db_ids.append([db_name_to_id[c]])
 
@@ -299,8 +298,6 @@ def run(args):
                                                                      opt_th=args.opt_thresh,
                                                                      inlier_ths=inlier_ths,
                                                                      retrieval_sources=retrieval_sources,
-                                                                     # gt_qvec=gt_poses[qname.split('/')[-1]][:4],
-                                                                     # gt_tvec=gt_poses[qname.split('/')[-1]][4:],
                                                                      gt_qvec=gt_poses[qname.split('/')[-1]][
                                                                          'qvec'] if qname.split('/')[
                                                                                         -1] in gt_poses.keys() else None,

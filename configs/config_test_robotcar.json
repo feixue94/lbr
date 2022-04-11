@@ -1,18 +1,13 @@
 {
   "name": "SHLoc",
   "dataset": "robotcar",
-  "gpu": 1,
-  "root": "/home/mifs/fx221/data/localization/RobotCar-Seasons",
-  "label_path": "global_seg_instance",
-  "image_path": "images",
+  "gpu": 0,
+  "image_path": "/scratches/flyer_2/fx221/localization/RobotCar-Seasons/images",
   "image_list": "datasets/robotcar/robotcar_rear_test_file_list_full.txt",
-  "image_list_": "datasets/robotcar/robotcar_rear_test_file_list.txt",
   "grgb_gid_file": "datasets/robotcar/robotcar_rear_grgb_gid.txt",
-  "classes": 2148,
-  "weight_cls": 2.0,
+  "classes": 692,
   "segmentation": 1,
-  "classification": 0,
-  "augmentation": 1,
+  "classification": 1,
   "network": "pspf",
   "encoder_name": "resnext101_32x4d",
   "encoder_weights": "ssl",
@@ -20,7 +15,6 @@
   "encoder_depth": 4,
   "upsampling": 8,
   "bs": 8,
-  "resume": "",
-  "save_dir": "/home/mifs/fx221/fx221/exp/shloc/robotcar",
-  "pretrained_weight": "2021_07_23_10_39_38_robotcar_pspf_resnext101_32x4d_ce_b6_seg_cls_aug_stylized/2021_07_23_10_39_38_robotcar_pspf_resnext101_32x4d_ce_b6_seg_cls_aug_stylized.best.pth"
+  "save_dir": "/scratches/flyer_2/fx221/exp/shloc/data_release/RobotCar-Seasons",
+  "pretrained_weight": "weights/2021_10_17_00_21_32_robotcar_pspf_resnext101_32x4d_d4_u8_b16_R256_E500_ceohem_adam_poly_mlr_seg_cls_aug.pth"
 }

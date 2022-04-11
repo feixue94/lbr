@@ -16,7 +16,7 @@
   "test_imglist": "./datasets/aachen/aachen_test_file_list_v5.txt",
   "train_cats": [
     "images/images_upright",
-    "images_aug/images_upright",
+    "images_aug1/images_upright",
     "images_aug2/images_upright"
   ],
   "val_cats": [

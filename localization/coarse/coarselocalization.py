@@ -96,7 +96,6 @@ class CoarseLocalization:
                 for l in lines:
                     l = l.strip()
                     imglist.append(l)
-
         else:
             imglist = os.listdir(seg_dir)
         imglist = sorted(imglist)
@@ -106,9 +105,9 @@ class CoarseLocalization:
         cv2.namedWindow("img", cv2.WINDOW_NORMAL)
         for fn in tqdm(imglist, total=len(imglist)):
             # print(osp.join(seg_dir, fn.replace("jpg", "png")))
+            if not osp.isfile(osp.join(seg_dir, fn.replace("jpg", "png"))):
+                continue
             seg_img = cv2.imread(osp.join(seg_dir, fn.replace("jpg", "png")))
-            # if not osp.exists(seg_img):
-            #     continue
             # seg_img = seg_img[:, seg_img.shape[1] // 3:seg_img.shape[1] // 3 * 2, ]
             cv2.imshow("img", seg_img)
             cv2.waitKey(5)
@@ -144,7 +143,6 @@ class CoarseLocalization:
             print("Save data to {:s}".format(save_tmp_fn))
             data = {"fn_gids": fn_gids, "gid_fns": gid_fns}
             np.save(save_tmp_fn, data)
-
         cv2.destroyAllWindows()
 
     def loc_by_rec(self, query_seg, k=20):

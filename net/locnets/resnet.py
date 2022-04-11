@@ -80,136 +80,6 @@ class ResBlock(nn.Module):
         return out
 
 
-class ResNetX(nn.Module):
-    def __init__(self, encoder_name='resnext101_32x4d', encoder_depth=3, encoder_weights='ssl', outdim=128,
-                 freeze_encoder=False):
-        super(ResNetX, self).__init__()
-
-        encoder = get_encoder(name=encoder_name,
-                              in_channels=3,
-                              depth=encoder_depth,
-                              weights=encoder_weights)
-
-        if encoder_depth == 3:
-            self.encoder = nn.Sequential(
-                encoder.conv1,
-                encoder.bn1,  # 2x ds
-                encoder.relu,
-                encoder.maxpool,
-                encoder.layer1,  # 4x ds
-                encoder.layer2,  # 8x ds
-            )
-            c = 512
-            self.ds = 8
-
-            self.conv = nn.Sequential(
-                nn.Conv2d(c, 256, kernel_size=3, stride=1, padding=1),
-                nn.BatchNorm2d(256),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-                nn.BatchNorm2d(256),
-                nn.ReLU(inplace=True),
-            )
-
-        elif encoder_depth == 2:
-            self.encoder = nn.Sequential(
-                encoder.conv1,
-                encoder.bn1,  # 2x ds
-                encoder.relu,
-                encoder.maxpool,
-                encoder.layer1,  # 4x ds
-            )
-            c = 256
-            self.ds = 4
-
-            self.conv = nn.Sequential(
-
-                ResBlock(inplanes=256, outplanes=256, groups=32),
-                ResBlock(inplanes=256, outplanes=256, groups=32),
-                ResBlock(inplanes=256, outplanes=256, groups=32),
-
-                nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-                nn.BatchNorm2d(256),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-                nn.BatchNorm2d(256),
-                nn.ReLU(inplace=True),
-            )
-
-        elif encoder_depth == 1:
-            self.encoder = nn.Sequential(
-                encoder.conv1,
-                encoder.bn1,  # 2x ds
-                encoder.relu,
-                encoder.maxpool,
-            )
-            c = 64
-            self.ds = 2
-            # TODO
-
-        if freeze_encoder:
-            print("Freeze encoder")
-            for param in self.encoder.parameters():
-                param.requires_grad = False
-
-        # Detector Head.
-        self.convPa = nn.Sequential(
-            torch.nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
-        )
-        self.convPb = torch.nn.Conv2d(256, self.ds * self.ds, kernel_size=1, stride=1, padding=0)
-
-        # Descriptor Head.
-        self.convDa = nn.Sequential(
-            torch.nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
-        )
-        self.convDb = torch.nn.Conv2d(256, outdim, kernel_size=1, stride=1, padding=0)
-
-    def det(self, x):
-        x = self.encoder(x)
-        # print(features[0].shape, features[1].shape, features[2].shape)
-        # print(features[3].shape)
-        # print(features[4].shape)
-        # print(len(features))
-
-        # pass through several CNN layers first
-        x = self.conv(x)
-
-        # Detector Head.
-        cPa = self.convPa(x)
-        semi = self.convPb(cPa)
-
-        # semi = torch.sigmoid(semi)
-
-        Hc, Wc = semi.size(2), semi.size(3)
-        # recover resolution
-        semi = semi.permute([0, 2, 3, 1])
-        score = semi.view(semi.size(0), Hc, Wc, self.ds, self.ds)
-        score = score.permute([0, 1, 3, 2, 4])
-        score = score.contiguous().view(score.size(0), Hc * self.ds, Wc * self.ds).unsqueeze(1)
-
-        # Descriptor Head
-        cDa = self.convDa(x)
-        desc = self.convDb(cDa)
-        desc = F.normalize(desc, dim=1)
-
-        return score, desc
-
-    def forward(self, batch):
-        b = batch['image1'].size(0)
-        x = torch.cat([batch['image1'], batch['image2']], dim=0)
-
-        score, desc = self.det(x)
-
-        return {
-            "score": score,
-            "desc": desc
-        }
-
-
 class ResNetXN(nn.Module):
     def __init__(self, encoder_name='resnext101_32x4d', encoder_depth=2, encoder_weights='ssl', outdim=128,
                  freeze_encoder=False):
@@ -418,15 +288,6 @@ def extract_resnet_return(model, img, conf_th=0.001,
             conf_thresh = conf_th
             nms_dist = 4
             border_remove = 4
-            # heatmap = heatmap.data.cpu().numpy().squeeze()
-            # xs, ys = np.where(heatmap >= conf_thresh)  # Confidence threshold.
-            #
-            # pts = np.zeros((3, len(xs)))  # Populate point data sized 3xN.
-            # pts[0, :] = ys
-            # pts[1, :] = xs
-            # pts[2, :] = heatmap[xs, ys]
-            #
-            # pts, _ = nms_fast(pts, nh, nw, dist_thresh=nms_dist)  # Apply NMS.
 
             scores = simple_nms(heatmap, nms_radius=nms_dist)
             keypoints = [
@@ -439,13 +300,6 @@ def extract_resnet_return(model, img, conf_th=0.001,
             keypoints = keypoints[0].data.cpu().numpy().squeeze()
             pts = keypoints.transpose()
             pts[2, :] = scores
-            # print(pts.shape, keypoints.shape)
-            # pts = np.zeros((3, keypoints.shape[0]))  # Populate point data sized 3xN.
-            # print(len(keypoints), keypoints[0].shape, keypoints[0][0])
-            # exit(0)
-            # pts[0, :] = keypoints[:, 1]
-            # pts[1, :] = keypoints[:, 0]
-            # pts[2, :] = scores
 
             inds = np.argsort(pts[2, :])
             pts = pts[:, inds[::-1]]  # Sort by confidence.
@@ -456,11 +310,6 @@ def extract_resnet_return(model, img, conf_th=0.001,
             toremove = np.logical_or(toremoveW, toremoveH)
             pts = pts[:, ~toremove]
 
-            # valid_idex = heatmap > conf_thresh
-            # valid_score = heatmap[valid_idex]
-            # """
-            # --- Process descriptor.
-            # coarse_desc = coarse_desc.data.cpu().numpy().squeeze()
             D = coarse_desc.size(1)
             if pts.shape[1] == 0:
                 desc = np.zeros((D, 0))
@@ -542,16 +391,6 @@ def extract_resnet_return(model, img, conf_th=0.001,
                 descriptors_with_labels.append(descriptors[i])
                 labels.append(gid)
 
-        # keypoints_with_labels = np.array(keypoints_with_labels)
-        # scores_with_labels = np.array(scores_with_labels)
-        # descriptors_with_labels = np.array(descriptors_with_labels)
-        # labels = np.array(labels, np.int32)
-        #
-        # keypoints_without_labels = np.array(keypoints_without_labels)
-        # scores_without_labels = np.array(scores_without_labels)
-        # descriptors_without_labels = np.array(descriptors_without_labels)
-        # others = np.array(others, np.int32)
-
         if topK > 0:
             if topK <= len(keypoints_with_labels):
                 idxes = np.array(scores_with_labels, np.float).argsort()[::-1][:topK]
@@ -560,10 +399,6 @@ def extract_resnet_return(model, img, conf_th=0.001,
                 labels = np.array(labels, np.int32)[idxes]
                 descriptors = np.array(descriptors_with_labels, np.float)[idxes]
             elif topK >= len(keypoints_with_labels) + len(keypoints_without_labels):
-                # keypoints = np.vstack([keypoints_with_labels, keypoints_without_labels])
-                # scores = np.vstack([scorescc_with_labels, scores_without_labels])
-                # descriptors = np.vstack([descriptors_with_labels, descriptors_without_labels])
-                # labels = np.vstack([labels, others])
                 keypoints = keypoints_with_labels
                 scores = scores_with_labels
                 descriptors = descriptors_with_labels
@@ -609,4 +444,3 @@ def extract_resnet_return(model, img, conf_th=0.001,
                 "descriptors": descriptors,
                 "scores": scores,
                 }
-    # return all_pts, all_descs, all_scores
