@@ -1,7 +1,7 @@
 # Efficient Large-scale Localization by Global Instance Recognition
 
 <p align="center">
-  <img src="assets/overview.png" width="1024">
+  <img src="assets/overview.png" width="960">
 </p>
 
 * Full paper PDF: [Efficient Large-scale Localization by Global Instance Recognition](https://arxiv.org/abs/1911.11763).
@@ -179,6 +179,6 @@ If you use any ideas from the paper or code from this repo, please consider citi
 
 ## Acknowledgements
 
-Part of the code is from previous excellent works including [SuperPoint](), [R2D2](https://github.com/naver/r2d2)
+Part of the code is from previous excellent works including [SuperPoint](https://github.com/magicleap/SuperPointPretrainedNetwork), [R2D2](https://github.com/naver/r2d2)
 , [hloc](https://github.com/cvg/Hierarchical-Localization). If you can find more details from their released
 repositories if you are interested in their works. 
