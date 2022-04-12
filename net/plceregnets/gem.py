@@ -5,15 +5,11 @@
 @Author fx221@cam.ac.uk
 @Date   25/08/2021 21:00
 =================================================='''
-import pdb
-import numpy as np
 import torch
-from torch.autograd import Variable
 import torch.nn as nn
 from torch.nn.modules import Module
 from torch.nn.parameter import Parameter
 import torch.nn.functional as F
-import math
 
 
 class GeneralizedMeanPooling(Module):

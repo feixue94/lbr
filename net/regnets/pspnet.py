@@ -14,7 +14,6 @@ from segmentation_models_pytorch.pspnet.decoder import PSPDecoder
 from segmentation_models_pytorch.base import SegmentationModel, SegmentationHead, ClassificationHead
 from segmentation_models_pytorch.base.modules import Flatten, Activation, Conv2dReLU
 import segmentation_models_pytorch.base.initialization as init
-import torchvision.models as models
 from loss.seg_loss.crossentropy_loss import cross_entropy2d
 
 from typing import Optional, Union

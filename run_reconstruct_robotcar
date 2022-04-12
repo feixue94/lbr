@@ -1,22 +1,13 @@
 #!/bin/bash
 colmap=/home/mifs/fx221/Research/Software/bin/colmap
 
-#root_dir=/scratches/flyer_2
 root_dir=/scratch2
 
 dataset=$root_dir/fx221/localization/RobotCar-Seasons
 outputs=$root_dir/fx221/localization/outputs/robotcar
 db_pair=$root_dir/fx221/localization/outputs/robotcar/pairs-db-covis20.txt
 
-
-#feat=resnete2-tr-n4096-r1024-0015-mask
-#feat=resnete2-tr-n3000-r1024-001-mask
-#feat=resnete2-tr-n4096-r1024-001-mask
-#feat=resnete2-tr-n3000-r1024-0005-mask
-feat=resnete2-tr-n4096-r1024-0005-mask
-#feat=resnete2-ms-tr-n4096-r1024-0005-mask
-#feat=resnete2-ms-tr-n3000-r1024-0005-mask
-
+feat=resnetxn-triv2-ms-0001-n4096-r1024-mask
 
 mask_dir=$root_dir/fx221/exp/shloc/robotcar/2021_10_17_00_21_32_robotcar_pspf_resnext101_32x4d_d4_u8_b16_R256_E500_ceohem_adam_poly_mlr_seg_cls_aug_stylized/masks
 

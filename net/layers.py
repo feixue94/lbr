@@ -1,11 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-@Time ： 2021/3/15 下午7:26
-@Auth ： Fei Xue
-@File ： layers.py
-@Email： feixue@pku.edu.cn
-"""
-
 import torch.nn as nn
 import torch.nn.functional as F
 

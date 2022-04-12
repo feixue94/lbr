@@ -2,20 +2,14 @@
 """
 @Time ： 2021/2/22 下午2:23
 @Auth ： Fei Xue
-@File ： extract_sgd2.py
-@Email： xuefei@sensetime.com
+@File ： extract_d2net.py
+@Email： fx221@cam.ac.uk
 """
 
-import os, pdb
-import scipy.io
-import scipy.misc
 import imageio
-from PIL import Image
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-
 
 
 class EmptyTensorError(Exception):
@@ -85,10 +79,10 @@ def interpolate_dense_features(pos, dense_features, return_corners=False):
     w_bottom_right = dist_i_top_left * dist_j_top_left
 
     descriptors = (
-        w_top_left * dense_features[:, i_top_left, j_top_left] +
-        w_top_right * dense_features[:, i_top_right, j_top_right] +
-        w_bottom_left * dense_features[:, i_bottom_left, j_bottom_left] +
-        w_bottom_right * dense_features[:, i_bottom_right, j_bottom_right]
+            w_top_left * dense_features[:, i_top_left, j_top_left] +
+            w_top_right * dense_features[:, i_top_right, j_top_right] +
+            w_bottom_left * dense_features[:, i_bottom_left, j_bottom_left] +
+            w_bottom_right * dense_features[:, i_bottom_right, j_bottom_right]
     )
 
     pos = torch.cat([i.view(1, -1), j.view(1, -1)], dim=0)
@@ -109,6 +103,7 @@ def upscale_positions(pos, scaling_steps=0):
     for _ in range(scaling_steps):
         pos = pos * 2 + 0.5
     return pos
+
 
 def process_multiscale(image, model, scales=[.5, 1, 2]):
     b, _, h_init, w_init = image.size()

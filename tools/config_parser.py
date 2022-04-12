@@ -6,7 +6,6 @@
 @Date   20/07/2021 10:51
 =================================================='''
 
-import os
 import logging
 from pathlib import Path
 from functools import reduce

@@ -1,16 +1,14 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2019/11/26 下午2:23
-# @Author  : Fei Xue
-# @Email   : feixue@pku.edu.cn
-# @File    : superpoint.py
-# @Software: PyCharm
+# -*- coding: UTF-8 -*-
+'''=================================================
+@Project -> File   shloc -> resnet
+@IDE    PyCharm
+@Author fx221@cam.ac.uk
+@Date   07/09/2021 22:11
+=================================================='''
 
-
-import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 import torch
-import cv2
 
 import time
 

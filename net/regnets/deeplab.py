@@ -12,7 +12,6 @@ from segmentation_models_pytorch.encoders import get_encoder
 from segmentation_models_pytorch.deeplabv3.decoder import DeepLabV3Decoder, DeepLabV3PlusDecoder
 from segmentation_models_pytorch.base import SegmentationModel, SegmentationHead, ClassificationHead
 from segmentation_models_pytorch.base.modules import Flatten, Activation, Conv2dReLU
-import segmentation_models_pytorch as smp
 from typing import Optional, Union
 
 

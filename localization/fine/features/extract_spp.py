@@ -3,17 +3,12 @@
 @Time ： 2021/2/8 下午1:28
 @Auth ： Fei Xue
 @File ： extract_spp.py
-@Email： xuefei@sensetime.com
+@Email： fx221@cam.ac.uk
 """
 import torch
 import torch.nn.functional as F
 import numpy as np
 import cv2
-import argparse
-import os
-import os.path as osp
-from tqdm import tqdm
-from net.locnets.superpoint import SuperPointNet
 
 
 def plot_keypoint(img_path, pts, scores=None):

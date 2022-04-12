@@ -2,11 +2,10 @@
 """
 @Time ： 2021/2/8 下午1:28
 @Auth ： Fei Xue
-@File ： extract_spp.py
-@Email： xuefei@sensetime.com
+@File ： extract_r2d2.py
+@Email： fx221@cam.ac.uk
 """
-import os, pdb
-from PIL import Image
+
 import numpy as np
 import torch
 import torch.nn as nn

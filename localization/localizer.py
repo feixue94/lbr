@@ -5,7 +5,6 @@
 @Author fx221@cam.ac.uk
 @Date   06/04/2022 15:07
 =================================================='''
-import torch
 import os
 import os.path as osp
 from tqdm import tqdm

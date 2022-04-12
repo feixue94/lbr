@@ -5,7 +5,6 @@
 @Author fx221@cam.ac.uk
 @Date   18/07/2021 10:22
 =================================================='''
-import torch
 import torch.utils.data as data
 from torch.utils.data.dataloader import *
 import numpy as np

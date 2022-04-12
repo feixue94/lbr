@@ -3,7 +3,7 @@
 @Time ： 2021/2/22 上午10:10
 @Auth ： Fei Xue
 @File ： extract_sift.py
-@Email： xuefei@sensetime.com
+@Email： fx221@cam.ac.uk
 """
 
 import argparse

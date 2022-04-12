@@ -11,11 +11,8 @@ import os.path as osp
 import numpy as np
 import cv2
 from tqdm import tqdm
-import argparse
 from tools.common import sort_dict_by_value, resize_img
 from localization.tools import read_retrieval_results
-from tools.seg_tools import label_to_bgr, read_seg_map_without_group
-
 
 def evaluate(pred_fn, gt_fn):
     results = {}

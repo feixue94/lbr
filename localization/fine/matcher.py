@@ -13,11 +13,8 @@ import h5py
 import logging
 from tqdm import tqdm
 import pprint
-import cv2
 import os
 import os.path as osp
-# from localization.fine.superglue.superglue import SuperGlue
-from localization.tools import plot_matches
 
 
 def names_to_pair(name0, name1):
