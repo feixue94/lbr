@@ -9,7 +9,9 @@ coarse and fine localization. For coarse localization, instead of performing glo
 for reference images from recognized global instances progressively. The recognized instances are further utilized for
 instance-wise feature detection and matching to enhance the localization accuracy.
 
-* Full paper PDF: [Efficient Large-scale Localization by Global Instance Recognition](https://arxiv.org/abs/1911.11763).
+* Full paper
+  PDF: [Efficient Large-scale Localization by Global Instance Recognition](https://openaccess.thecvf.com/content/CVPR2022/papers/Xue_Efficient_Large-Scale_Localization_by_Global_Instance_Recognition_CVPR_2022_paper.pdf)
+  .
 
 * Authors: *Fei Xue, Ignas Budvytis, Daniel Olmeda Reino, Roberto Cipolla*
 
@@ -38,9 +40,10 @@ You can download global instance labels used in this work here:
 * [Global instances of Aachen_v1.1](https://drive.google.com/file/d/17qerRcU8Iemjwz7tUtlX9syfN-WVSs4K/view?usp=sharing)
 * [Global instances of RobotCar-Seasons](https://drive.google.com/file/d/1Ns5I3YGoMCBURzWKZTxqsugeG4jUcj4a/view?usp=sharing)
 
-Since only daytime images are included in Aachen_v1.1 and RobotCar-Seasons database, which may cause huge recognition errors for the
-recognition of nighttime query images, we augment the training data by generating some stylized images, which can also
-be downloaded along with global instances. The structure of files in Aachen_v1.1 dataset should be like this:
+Since only daytime images are included in Aachen_v1.1 and RobotCar-Seasons database, which may cause huge recognition
+errors for the recognition of nighttime query images, we augment the training data by generating some stylized images,
+which can also be downloaded along with global instances. The structure of files in Aachen_v1.1 dataset should be like
+this:
 
 ```
 - aachen_v1.1
@@ -130,6 +133,7 @@ For fine localization, you also need a 3D map of the environment reconstructed b
 ```
 
 ## Localization with global instances
+
 Once you have the global instance masks of the query and database images and the 3D map of the scene, you can run the
 following commands for localization.
 
@@ -160,6 +164,7 @@ you will get results like this:
 | post-cvpr | 28.1 / 66.9 / 91.8 | 46.1 / 73.6 / 92.5 |
 
 ## Training
+
 If you want to retrain the recognition network, you can run the following commands.
 
 * training recognition on Aachen_v1.1
